@@ -27,6 +27,8 @@ public class AnalysisJob {
     private volatile Instant startedAt;
     private volatile Instant completedAt;
     private volatile String message = "Queued";
+    private volatile String inputName;
+    private volatile String inputHash;
     private volatile AnalysisResult result;
     private volatile Future<?> future;
 
@@ -98,6 +100,22 @@ public class AnalysisJob {
 
     public void result(AnalysisResult result) {
         this.result = result;
+    }
+
+    public String inputName() {
+        return inputName;
+    }
+
+    public void inputName(String inputName) {
+        this.inputName = inputName;
+    }
+
+    public String inputHash() {
+        return inputHash;
+    }
+
+    public void inputHash(String inputHash) {
+        this.inputHash = inputHash;
     }
 
     public Future<?> future() {

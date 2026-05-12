@@ -5,7 +5,7 @@
 JARScan is a full-stack local web application composed of:
 
 - a Spring Boot backend
-- a React/Vite frontend
+- a React and Vite frontend
 - a Docker runtime that bundles Java 25, Maven CLI, and Dependency-Check CLI
 
 The frontend is built into static assets and served by the backend in the containerized deployment.
@@ -22,6 +22,7 @@ Visible package areas:
 - `job`
 - `maven`
 - `model`
+- `persistence`
 - `service`
 - `util`
 - `vulnerability`
@@ -30,12 +31,14 @@ Important controllers currently visible:
 
 - `AppInfoController`
 - `JobController`
+- `ScanHistoryController`
 - `VulnerabilityDbController`
 - `SpaForwardController`
 
 Important services currently visible:
 
 - `AnalysisJobService`
+- `ScanHistoryService`
 - `JarAnalyzerService`
 - `MavenResolutionService`
 - `ProgressEventService`
@@ -73,7 +76,7 @@ The app shell provides:
 Current Docker setup uses:
 
 - frontend build stage with Node
-- backend build stage with Maven + Eclipse Temurin 25
+- backend build stage with Maven plus Eclipse Temurin 25
 - final runtime image based on `maven:3.9.14-eclipse-temurin-25`
 
 The final runtime includes:
@@ -84,46 +87,59 @@ The final runtime includes:
 - built frontend static files inside the application
 - OWASP Dependency-Check CLI installed under `/opt/dependency-check`
 
-## Data Persistence As Of v1
+## Data Persistence As Of Session 2
 
-Current persistence in v1 is limited:
+Persistence is now split into three categories.
 
-- completed scan jobs/results live only in backend memory for the lifetime of the running container
-- Maven repository cache persists through Docker volume `jarscan-m2`
-- Dependency-Check data persists through Docker volume `jarscan-data`
+Persistent local data:
 
-Current mounted locations:
+- SQLite scan history database under `/app/data/jarscan.db` by default
+- Maven repository cache under `/root/.m2`
+- Dependency-Check data under `/app/data/dependency-check`
 
-- `/root/.m2`
-- `/app/data`
-- `/app/data/dependency-check`
+Transient runtime state:
+
+- active jobs in the in-memory registry
+- live SSE emitters and replay buffers
+- temporary job workspaces used during analysis
 
 ## Planned SQLite Persistence For v2
 
-Planned v2 persistence direction is SQLite at:
+The Session 2 persistence foundation intentionally starts with a single history table.
 
-- `/app/data/jarscan.db`
+Currently persisted:
 
-The intent is to persist:
-
-- scan metadata and summary fields
+- scan metadata
+- summary counts
+- job status for terminal states
 - full result JSON
-- settings such as NVD API key and defaults
+- editable notes and tags
+
+Planned future SQLite data:
+
+- app settings such as NVD API key and defaults
 - suppressions
 - policies
 
 ## SSE Progress Architecture
 
-Current progress model is based on Server-Sent Events:
+Current progress model is based on Server-Sent Events.
 
-- job execution is started with `POST /api/jobs`
+Job flow:
+
+- job execution starts with `POST /api/jobs`
 - clients subscribe to `GET /api/jobs/{jobId}/events`
-- the backend stores job events in memory and replays them to new subscribers
+- backend stores active job events in memory and replays them to new subscribers
 - progress events include phase, type, message, optional percent, and item counters
 
-There is a second SSE stream for vulnerability DB updates:
+Vulnerability DB flow:
 
-- `GET /api/vulnerability-db/events`
+- `GET /api/vulnerability-db/events` streams Dependency-Check DB update events
+
+Important Session 2 note:
+
+- persisted scan history does not replace the live SSE model
+- SSE is still runtime-only for active work, while final scan results are saved to SQLite after terminal completion
 
 ## Maven Execution Flow
 
@@ -162,11 +178,13 @@ Fallback behavior exists through:
 Backend pieces visible from code:
 
 - `JobController`: job creation, status, result, SSE stream, cancellation, exports
+- `ScanHistoryController`: scan history list, detail, delete, metadata patch
 - `VulnerabilityDbController`: DB status, manual sync trigger, DB event stream
-- `AnalysisJobService`: in-memory job lifecycle and orchestration
+- `AnalysisJobService`: active job lifecycle and orchestration
+- `ScanHistoryService`: persistence bridge between terminal jobs and SQLite history
 - `JarAnalyzerService`: archive inspection and nested archive analysis
 - `MavenResolutionService`: Maven CLI orchestration
-- `ReportExportService`: JSON/Markdown/HTML export generation
+- `ReportExportService`: JSON, Markdown, and HTML export generation
 
 Frontend pieces visible from code:
 
@@ -180,7 +198,7 @@ Frontend pieces visible from code:
 
 ## Important Data Models Visible In Code
 
-Key DTOs/models currently visible:
+Key DTOs and models currently visible:
 
 - `AnalysisResult`
 - `AnalysisSummary`
@@ -189,9 +207,11 @@ Key DTOs/models currently visible:
 - `VulnerabilityFinding`
 - `ProgressEvent`
 - `AnalysisJob`
+- `StoredScanSummaryResponse`
+- `StoredScanResponse`
 - `VulnerabilityDbStatus`
 - `MavenCoordinates`
 - `ManifestInfo`
 - `JavaVersionInfo`
 
-These are the current backbone of scan execution, response payloads, exports, and UI rendering.
+These are the current backbone of scan execution, response payloads, persistence mapping, exports, and UI rendering.

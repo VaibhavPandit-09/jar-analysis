@@ -1,0 +1,9 @@
+jarscan:
+  app-version: test-version
+  data-dir: ${user.dir}/target/test-data
+  db-path: ${user.dir}/target/test-data/jarscan.db
+  dependency-check-command: dependency-check.sh
+
+spring:
+  flyway:
+    clean-disabled: false

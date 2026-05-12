@@ -1,39 +1,44 @@
 # Database Schema
 
-## Current v1 Persistence State
+## Current Persistence State
 
-As of v1, JARScan does not persist completed scan history in a database.
+As of Session 2, JARScan persists completed scan history in SQLite.
 
-Current limitation:
+Current database location rules:
 
-- scan jobs and results are stored only in memory for the lifetime of the running container
+- `JARSCAN_DB_PATH` if explicitly provided
+- otherwise `${JARSCAN_DATA_DIR}/jarscan.db`
+- otherwise `/app/data/jarscan.db`
 
-What does persist today:
+For local development and tests, the backend may override this to a workspace-local path such as `./data/jarscan.db` or `backend/target/test-data/jarscan.db`.
+
+What still persists outside SQLite:
 
 - Maven cache in `/root/.m2`
 - Dependency-Check cache in `/app/data/dependency-check`
 
-## Planned v2 SQLite Database
+What is still in-memory:
 
-Planned database file:
+- active job registry
+- active SSE emitter state and replay buffers
 
-- `/app/data/jarscan.db`
+## Current `scans` Table
 
-SQLite is planned because it is a good fit for a local-first Dockerized developer tool and avoids adding an external database dependency.
+The current Flyway migration creates a single `scans` table intended to support fast history listing plus exact result reopening.
 
-## Planned `scans` Table
-
-Suggested direction:
+Columns:
 
 - `id`
-- `created_at`
-- `completed_at`
-- `status`
+- `job_id`
 - `input_type`
 - `input_name`
+- `input_hash`
+- `status`
+- `started_at`
+- `completed_at`
+- `duration_ms`
 - `total_artifacts`
 - `total_dependencies`
-- `vulnerable_dependencies`
 - `total_vulnerabilities`
 - `critical_count`
 - `high_count`
@@ -43,18 +48,33 @@ Suggested direction:
 - `unknown_count`
 - `highest_cvss`
 - `required_java_version`
-- `warning_count`
-- `error_count`
+- `created_app_version`
+- `notes`
+- `tags`
 - `result_json`
+- `created_at`
+- `updated_at`
 
-Purpose:
+Important constraints and indexes:
 
-- relational columns support list views, filtering, sorting, comparison, and summary rendering
-- `result_json` preserves full detail without requiring many secondary tables up front
+- `job_id` is unique
+- index on `created_at`
+- index on `status`
+- index on `input_type`
+- index on `completed_at`
+
+## Summary Columns Plus `result_json` Approach
+
+JARScan intentionally stores both:
+
+- relational summary columns for fast listing, filtering, sorting, and future comparison
+- full `result_json` for exact result reopening, export reuse, and schema-flexible evolution
+
+This keeps the first persistence layer maintainable without immediately normalizing every nested artifact, dependency, or vulnerability into separate tables.
 
 ## Planned `app_settings` Table
 
-Suggested direction:
+Likely direction for Session 4 and later:
 
 - `key`
 - `value`
@@ -63,12 +83,12 @@ Suggested direction:
 Likely settings:
 
 - NVD API key
-- default Maven scope
-- UI/scan defaults as needed
+- default Maven dependency scope
+- UI and scan defaults as needed
 
 ## Planned `suppressions` Table
 
-Suggested direction:
+Likely direction for Session 10:
 
 - `id`
 - `created_at`
@@ -83,11 +103,12 @@ Possible targets:
 
 - vulnerability identifiers
 - package identifiers
-- dependency coordinates
+- Maven coordinates
+- dependency paths
 
 ## Planned `policies` Table
 
-Suggested direction:
+Likely direction for Session 10:
 
 - `id`
 - `name`
@@ -97,24 +118,18 @@ Suggested direction:
 - `created_at`
 - `updated_at`
 
-`config_json` can support evolving policy rules without frequent schema churn.
-
-## Summary Columns Plus `result_json` Approach
-
-The recommended storage shape is:
-
-- normalized enough for fast history/search/comparison operations
-- denormalized enough to keep implementation practical
-- full-fidelity result preserved as raw JSON for exact reopening/export
-
-This avoids needing to decompose every nested artifact and finding into many relational tables in the first persistence session.
+`config_json` is the expected escape hatch for policy evolution without frequent schema churn.
 
 ## Migration Notes
 
-When v2 persistence is added:
+Current schema management:
 
-- keep current API result shapes stable where possible
-- map current `AnalysisResult` output into stored `result_json`
-- compute summary columns from the same result object
-- avoid breaking existing frontend result rendering logic
-- consider a simple version or migration table once schema evolution begins
+- Flyway is enabled in the backend
+- the initial migration creates the `scans` table
+
+Guidance for future sessions:
+
+- keep current `AnalysisResult` JSON shape stable where practical
+- prefer additive migrations over destructive schema changes
+- preserve backward compatibility for stored `result_json`
+- treat summary columns as denormalized indexes over the full stored result

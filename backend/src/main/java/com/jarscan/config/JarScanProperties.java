@@ -8,7 +8,9 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "jarscan")
 public record JarScanProperties(
+        @NotBlank String appVersion,
         @NotBlank String dataDir,
+        @NotBlank String dbPath,
         @NotBlank String dependencyCheckCommand,
         @Min(1) int maxNestedJarDepth,
         @Min(1) long maxExtractedArchiveSizeBytes,

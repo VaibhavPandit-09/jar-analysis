@@ -1,8 +1,8 @@
 # API Reference
 
-This file documents currently visible v1 backend endpoints and planned v2 API expansion.
+This file documents currently visible backend endpoints and planned v2 expansion.
 
-## Existing v1 Endpoints
+## Existing Endpoints
 
 ### App Info
 
@@ -17,24 +17,55 @@ This file documents currently visible v1 backend endpoints and planned v2 API ex
 
 - `GET /api/jobs/{jobId}/status`
   - returns current job state
+  - checks active in-memory jobs first
+  - falls back to persisted status for stored completed or failed scans when possible
 
 - `GET /api/jobs/{jobId}/result`
   - returns completed result JSON
-  - currently returns HTTP 202-style error behavior if not ready yet
+  - checks active in-memory result first
+  - falls back to persisted `result_json` from SQLite when the job is no longer in memory
 
 - `POST /api/jobs/{jobId}/cancel`
-  - requests cancellation
+  - requests cancellation of an active job
 
 ### Job SSE
 
 - `GET /api/jobs/{jobId}/events`
-  - job progress/log/completion event stream
+  - job progress, log, completion, and error event stream for active jobs
 
 ### Export Endpoints
 
 - `GET /api/jobs/{jobId}/export?format=json`
 - `GET /api/jobs/{jobId}/export?format=markdown`
 - `GET /api/jobs/{jobId}/export?format=html`
+
+Exports continue to operate against the existing job/result model. Future sessions may add scan-id-based exports if needed.
+
+### Scan History APIs
+
+- `GET /api/scans`
+  - returns stored scan summaries
+  - supported query parameters:
+    - `q`
+    - `inputType`
+    - `status`
+    - `severity`
+    - `sort`
+    - `direction`
+    - `limit`
+    - `offset`
+
+- `GET /api/scans/{scanId}`
+  - returns the stored scan summary plus full persisted result
+
+- `DELETE /api/scans/{scanId}`
+  - deletes a stored scan record
+
+- `PATCH /api/scans/{scanId}`
+  - updates editable metadata
+  - current editable fields:
+    - `notes`
+    - `tags`
 
 ### Vulnerability DB APIs
 
@@ -47,52 +78,37 @@ This file documents currently visible v1 backend endpoints and planned v2 API ex
 ### Vulnerability DB SSE
 
 - `GET /api/vulnerability-db/events`
-  - DB sync event stream
+  - Dependency-Check DB sync event stream
 
-## Current v1 Response Types Visible In Code
+## Current Response Types Visible In Code
 
-The following response DTOs are visible:
+The following response DTOs are visible or directly implied by controller/service code:
 
 - `AnalysisJobResponse`
 - `AnalysisJobStatusResponse`
 - `AnalysisResult`
 - `ProgressEvent`
 - `VulnerabilityDbStatus`
-
-## Planned v2 Scan History Endpoints
-
-Expected direction for v2:
-
-- `GET /api/scans`
-- `GET /api/scans/{scanId}`
-- `GET /api/scans/{scanId}/result`
-- `DELETE /api/scans/{scanId}`
-- `POST /api/scans/{scanId}/reopen`
-
-Possible query features:
-
-- search
-- sort
-- pagination
-- filters by input type, severity, date range
+- `StoredScanSummaryResponse`
+- `StoredScanResponse`
 
 ## Planned v2 Comparison Endpoints
 
-Expected direction:
+Expected direction for Session 5:
 
 - `GET /api/scans/compare?left={scanId}&right={scanId}`
 - or `POST /api/scans/compare`
 
 Possible outputs:
 
-- dependency additions/removals
+- dependency additions and removals
 - version changes
 - vulnerability deltas
 - policy delta summaries
 
 ## Planned v2 Settings / NVD Endpoints
 
-Expected direction:
+Expected direction for Session 4:
 
 - `GET /api/settings`
 - `PUT /api/settings`
@@ -103,11 +119,11 @@ Potential stored values:
 
 - NVD API key
 - default Maven dependency scope
-- scan retention preferences
+- scan defaults
 
 ## Planned v2 Suppression Endpoints
 
-Expected direction:
+Expected direction for Session 10:
 
 - `GET /api/suppressions`
 - `POST /api/suppressions`
@@ -116,7 +132,7 @@ Expected direction:
 
 ## Planned v2 Policy Endpoints
 
-Expected direction:
+Expected direction for Session 10:
 
 - `GET /api/policies`
 - `POST /api/policies`
@@ -126,11 +142,11 @@ Expected direction:
 
 ## Planned v2 SBOM Endpoints
 
-Expected direction:
+Expected direction for Session 10:
 
 - `POST /api/sbom/import`
 - `GET /api/scans/{scanId}/sbom`
 - `GET /api/scans/{scanId}/sbom?format=cyclonedx`
 - `GET /api/scans/{scanId}/sbom?format=spdx`
 
-These are planning notes, not currently implemented endpoints.
+These planned endpoints are roadmap notes, not currently implemented behavior.

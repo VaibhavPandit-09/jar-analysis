@@ -10,6 +10,7 @@ Current package layout under `backend/src/main/java/com/jarscan`:
 - `job`
 - `maven`
 - `model`
+- `persistence`
 - `service`
 - `util`
 - `vulnerability`
@@ -30,6 +31,13 @@ Current package layout under `backend/src/main/java/com/jarscan`:
 - export job result
 - cancel running jobs
 
+### `ScanHistoryController`
+
+- list persisted scans
+- fetch stored scan details
+- delete stored scans
+- update stored notes and tags
+
 ### `VulnerabilityDbController`
 
 - expose Dependency-Check DB status
@@ -44,13 +52,23 @@ Current package layout under `backend/src/main/java/com/jarscan`:
 
 ### `AnalysisJobService`
 
-- owns the in-memory job registry
+- owns the active in-memory job registry
 - validates uploads
 - creates per-job workspaces
-- decides archive vs `pom.xml` flow
+- decides archive versus `pom.xml` flow
 - orchestrates Maven resolution, artifact analysis, vulnerability scanning, and final result creation
 - publishes SSE progress events
 - handles cancellation
+- now persists terminal scan state through `ScanHistoryService`
+- still serves job status and results from memory first for active or recent jobs
+
+### `ScanHistoryService`
+
+- maps completed or terminal jobs into persisted scan records
+- extracts summary fields from `AnalysisResult`
+- stores full `result_json`
+- looks up persisted result and status by `jobId`
+- supports history list, detail, delete, and metadata update operations
 
 ### `JarAnalyzerService`
 
@@ -76,13 +94,13 @@ Current package layout under `backend/src/main/java/com/jarscan`:
 
 - stores SSE emitters per job
 - replays prior events to new subscribers
-- publishes job progress/log/error/completion events
+- publishes job progress, log, error, and completion events
 
 ### `ReportExportService`
 
 - serializes JSON export
-- renders simple Markdown export
-- renders simple HTML export
+- renders Markdown export
+- renders HTML export
 
 ### `VulnerabilityScannerService`
 
@@ -90,7 +108,25 @@ Current package layout under `backend/src/main/java/com/jarscan`:
 
 ### `VulnerabilityDbEventService`
 
-- SSE event fanout for database sync events
+- SSE fanout for database sync events
+
+## Persistence Layer
+
+### `ScanHistoryRepository`
+
+- plain JDBC repository backed by SQLite
+- handles upsert, list, lookup, delete, and metadata update operations
+- stores tags as JSON text
+- deserializes `result_json` back into `AnalysisResult`
+
+### Persistence Models
+
+- `PersistedScanRecord`
+- `PersistedScanUpsert`
+- `ScanSearchCriteria`
+- `StoredScanMetadataUpdate`
+
+These exist to keep controller DTOs and database row mapping separated from job orchestration models.
 
 ## Model / DTO Responsibilities
 
@@ -98,31 +134,37 @@ Visible DTO and model roles:
 
 - `AnalysisResult`: completed job payload
 - `AnalysisSummary`: top-level totals and severity summary
-- `ArtifactAnalysis`: per artifact result including nested artifacts
+- `ArtifactAnalysis`: per-artifact result including nested artifacts
 - `DependencyInfo`: dependency rows shown in UI
 - `VulnerabilityFinding`: vulnerability details
 - `ProgressEvent`: unified SSE event payload
 - `AnalysisJobResponse`: job creation response
 - `AnalysisJobStatusResponse`: polling status response
+- `StoredScanSummaryResponse`: history list row payload
+- `StoredScanResponse`: stored scan detail payload
+- `UpdateStoredScanRequest`: notes and tags patch payload
 - `VulnerabilityDbStatus`: Dependency-Check DB state
-- `MavenCoordinates`: extracted group/artifact/version
+- `MavenCoordinates`: extracted group, artifact, version
 - `ManifestInfo`: manifest fields and raw attributes
 - `JavaVersionInfo`: bytecode version summary
-- `AnalysisJob`: in-memory mutable job state
+- `AnalysisJob`: mutable active job state
 
 ## Configuration Layer
 
 Visible configuration:
 
 - `JarScanProperties`
+- `DatabaseConfig`
 - `AsyncConfig`
 - `application.yml`
 
 Important backend configuration concerns already represented:
 
+- app version
 - data directory
+- SQLite DB path
 - Dependency-Check command path
-- nested-archive depth
+- nested archive depth
 - extraction budget
 - Maven timeout
 - default Maven dependency scope
@@ -130,25 +172,26 @@ Important backend configuration concerns already represented:
 
 ## Job System
 
-Current job system is in-memory only.
+The job system is intentionally split between transient execution state and persisted history.
 
-Key characteristics:
+Current characteristics:
 
 - jobs keyed by generated UUID
 - asynchronous execution via shared executor
 - temporary workspace per job
-- result retained in memory
-- status transitions through `QUEUED`, `RUNNING`, `COMPLETED`, `FAILED`, `CANCELLED`
+- result retained in memory while the app is running
+- completed, failed, and cancelled terminal states persisted to SQLite
+- `GET /api/jobs/{jobId}/result` and `/status` can fall back to persisted data when the in-memory job is gone
 - cancellation tries to stop active external processes
 
 ## Analyzer System
 
-The current analyzer system is archive-centric.
+The analyzer system remains archive-centric.
 
 It analyzes:
 
 - top-level uploads
-- nested JAR/WAR libraries in common bundle directories
+- nested JAR and WAR libraries in common bundle directories
 - bytecode headers
 - manifest attributes
 - Maven metadata files
@@ -164,7 +207,7 @@ Important code path:
 - `AnalysisJobService` detects `InputType.POM`
 - `MavenResolutionService` builds CLI commands
 - dependency files are copied into a job-local output directory
-- dependency tree text is captured for output/export
+- dependency tree text is captured for output and export
 
 ## Vulnerability System
 
@@ -183,20 +226,19 @@ Current behavior:
 
 ## Current Persistence Limitation
 
-The biggest backend limitation in v1 is persistence:
+Persistence is now available for completed scan history, but the backend is not fully persistence-backed yet.
 
-- completed scans disappear when the container restarts
-- there is no SQLite or file-backed scan history yet
-- settings are not persisted in application storage yet
+Current gaps:
+
+- active jobs are still in-memory only
+- SSE event buffers are still in-memory only
+- app settings, suppressions, and policies are not persisted yet
 
 ## Planned v2 Persistence Direction
 
-Planned v2 direction:
+Planned next steps on top of Session 2:
 
-- SQLite database at `/app/data/jarscan.db`
-- scan summaries stored in relational columns
-- full result JSON stored alongside summary fields
-- app settings persisted locally
-- suppressions and policies stored locally
-
-Future sessions should preserve the current DTO/result structure as much as possible so UI reuse is straightforward once persistence is added.
+- SQLite-backed app settings
+- scan history reopening in the UI
+- comparison features built against persisted scan summaries plus full stored results
+- locally persisted suppressions and policies in later sessions

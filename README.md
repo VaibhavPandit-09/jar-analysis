@@ -52,7 +52,7 @@ Open [http://localhost:8080](http://localhost:8080).
 1. Files are copied into a job-specific temporary workspace.
 2. JARScan inspects archive entries, hashes, manifests, bytecode versions, Maven metadata, and nested libraries.
 3. Dependency-Check scans the extracted artifact set if its CLI is available.
-4. Results are persisted in-memory for the running app and exposed through the results API and UI.
+4. Results are exposed through the results API and UI, and completed scans are persisted into local SQLite history.
 
 ### `pom.xml` upload
 
@@ -70,6 +70,15 @@ Open [http://localhost:8080](http://localhost:8080).
   - Dependency-Check data cache lives under `/app/data/dependency-check`
 - `jarscan-m2` to `/root/.m2`
   - Maven dependency cache for faster repeated POM analysis
+
+## Persistent Scan History
+
+Completed scans are stored in a local SQLite database so history survives container restarts and image rebuilds as long as the Docker volume is preserved.
+
+- Default database path: `/app/data/jarscan.db`
+- Override with `JARSCAN_DB_PATH`
+- The database lives under the `jarscan-data` volume by default
+- Deleting Docker volumes with `docker compose down -v` also deletes stored scan history
 
 ## Local Development
 
@@ -95,6 +104,7 @@ The Vite dev server proxies `/api` requests to `http://localhost:8080`.
 Environment variables supported by the backend:
 
 - `JARSCAN_DATA_DIR`
+- `JARSCAN_DB_PATH`
 - `JARSCAN_DEPENDENCY_CHECK_COMMAND`
 - `JARSCAN_MAX_UPLOAD_SIZE`
 - `JARSCAN_MAVEN_TIMEOUT_SECONDS`
@@ -150,5 +160,5 @@ The project is built and run on Eclipse Temurin Java 25 through the official Mav
 
 - Dependency-Check findings depend on its local database state and may take time on a cold start.
 - Private Maven repositories are not automatically authenticated.
-- The current results API stores completed jobs in-memory for the lifetime of the running container rather than in a database.
+- Running jobs and SSE event streams are still in-memory while the job is active, even though completed scan results now persist in SQLite history.
 - Dependency tables on individual artifact cards focus on embedded nested archives rather than reconstructing a full Maven graph per artifact.

@@ -1,6 +1,15 @@
 spring:
   application:
     name: jarscan
+  datasource:
+    driver-class-name: org.sqlite.JDBC
+    hikari:
+      maximum-pool-size: 1
+      minimum-idle: 1
+    url: jdbc:sqlite:${jarscan.db-path}
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
   servlet:
     multipart:
       max-file-size: ${JARSCAN_MAX_UPLOAD_SIZE:500MB}
@@ -19,7 +28,9 @@ server:
   shutdown: graceful
 
 jarscan:
-  data-dir: ${JARSCAN_DATA_DIR:${user.home}/.jarscan}
+  app-version: ${JARSCAN_APP_VERSION:0.1.0-SNAPSHOT}
+  data-dir: ${JARSCAN_DATA_DIR:/app/data}
+  db-path: ${JARSCAN_DB_PATH:${JARSCAN_DATA_DIR:/app/data}/jarscan.db}
   dependency-check-command: ${JARSCAN_DEPENDENCY_CHECK_COMMAND:dependency-check.sh}
   max-nested-jar-depth: ${JARSCAN_MAX_NESTED_JAR_DEPTH:4}
   max-extracted-archive-size-bytes: ${JARSCAN_MAX_EXTRACTED_ARCHIVE_SIZE_BYTES:268435456}

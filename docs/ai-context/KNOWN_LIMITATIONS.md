@@ -6,11 +6,15 @@ Dependency-Check results depend on the freshness and health of the local vulnera
 
 ## NVD API Key Performance Differences
 
-JARScan should remain usable without an NVD API key, but users should expect slower or more rate-limited update behavior compared with a configured key.
+JARScan remains usable without an NVD API key, but users should expect slower or more rate-limited database update behavior compared with a configured key once that setting is introduced.
 
 ## Private Maven Repository Authentication
 
 Uploaded `pom.xml` resolution depends on the Maven CLI environment inside the container. Private repository credentials, mirrors, or custom settings are not automatically available unless explicitly provided.
+
+## Running Jobs And Live SSE State Are Still In-Memory
+
+Completed scan history is now persisted in SQLite under `/app/data/jarscan.db`, but active jobs, live progress state, and SSE replay buffers are still runtime-only. A container restart during an in-flight job will still lose that active execution state.
 
 ## Unused Dependency Confidence Caveats
 
@@ -22,7 +26,7 @@ Even when project files or bytecode are inspected, usage evidence may miss depen
 
 - reflection
 - service loaders
-- XML/YAML/properties configuration
+- XML, YAML, or properties configuration
 - container-managed injection
 - runtime classpath conventions
 
@@ -32,7 +36,7 @@ JARScan does not provide general source-code vulnerability scanning. It must not
 
 ## Standalone JARs Without POMs Have Limited Graph Reconstruction
 
-If an uploaded archive lacks embedded Maven metadata or a related POM context, JARScan can still inspect packaged contents but may not be able to reconstruct a full dependency graph accurately.
+If an uploaded archive lacks embedded Maven metadata or related POM context, JARScan can still inspect packaged contents but may not be able to reconstruct a full dependency graph accurately.
 
 ## Project ZIPs Without Compiled Classes Are Less Reliable For Usage Analysis
 

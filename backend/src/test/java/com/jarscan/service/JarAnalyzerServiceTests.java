@@ -22,7 +22,9 @@ class JarAnalyzerServiceTests {
 
     private final JarAnalyzerService jarAnalyzerService = new JarAnalyzerService(
             new JarScanProperties(
+                    "0.1.0-test",
                     Files.createTempDirectory("jarscan-tests").toString(),
+                    Files.createTempDirectory("jarscan-tests-db").resolve("jarscan.db").toString(),
                     "dependency-check.sh",
                     4,
                     10_000_000,

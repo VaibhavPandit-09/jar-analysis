@@ -3,7 +3,6 @@ package com.jarscan.service;
 import com.jarscan.dto.AnalysisJobResponse;
 import com.jarscan.dto.AnalysisJobStatusResponse;
 import com.jarscan.dto.AnalysisResult;
-import com.jarscan.dto.AnalysisSummary;
 import com.jarscan.dto.ArtifactAnalysis;
 import com.jarscan.dto.ProgressEvent;
 import com.jarscan.job.AnalysisJob;
@@ -15,6 +14,7 @@ import com.jarscan.model.ProgressEventType;
 import com.jarscan.model.ProgressPhase;
 import com.jarscan.util.AnalysisSummaryFactory;
 import com.jarscan.util.FilenameSanitizer;
+import com.jarscan.util.HashUtils;
 import com.jarscan.util.JobDirectories;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -22,6 +22,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -42,19 +43,22 @@ public class AnalysisJobService {
     private final JarAnalyzerService jarAnalyzerService;
     private final MavenResolutionService mavenResolutionService;
     private final VulnerabilityScannerService vulnerabilityScannerService;
+    private final ScanHistoryService scanHistoryService;
 
     public AnalysisJobService(
             ExecutorService analysisExecutor,
             ProgressEventService progressEventService,
             JarAnalyzerService jarAnalyzerService,
             MavenResolutionService mavenResolutionService,
-            VulnerabilityScannerService vulnerabilityScannerService
+            VulnerabilityScannerService vulnerabilityScannerService,
+            ScanHistoryService scanHistoryService
     ) {
         this.analysisExecutor = analysisExecutor;
         this.progressEventService = progressEventService;
         this.jarAnalyzerService = jarAnalyzerService;
         this.mavenResolutionService = mavenResolutionService;
         this.vulnerabilityScannerService = vulnerabilityScannerService;
+        this.scanHistoryService = scanHistoryService;
     }
 
     public AnalysisJobResponse createJob(List<MultipartFile> files) {
@@ -78,7 +82,11 @@ public class AnalysisJobService {
     }
 
     public AnalysisJobStatusResponse getStatus(String jobId) {
-        AnalysisJob job = getJob(jobId);
+        AnalysisJob job = jobs.get(jobId);
+        if (job == null) {
+            return scanHistoryService.findStatusByJobId(jobId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown job: " + jobId));
+        }
         return new AnalysisJobStatusResponse(
                 job.id(),
                 job.status(),
@@ -92,11 +100,15 @@ public class AnalysisJobService {
     }
 
     public AnalysisResult getResult(String jobId) {
-        AnalysisJob job = getJob(jobId);
-        if (job.result() == null) {
-            throw new ResponseStatusException(HttpStatus.ACCEPTED, "Result is not available yet");
+        AnalysisJob job = jobs.get(jobId);
+        if (job != null && job.result() != null) {
+            return job.result();
         }
-        return job.result();
+        return scanHistoryService.findResultByJobId(jobId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        job == null ? HttpStatus.NOT_FOUND : HttpStatus.ACCEPTED,
+                        job == null ? "Unknown job: " + jobId : "Result is not available yet"
+                ));
     }
 
     public AnalysisJobStatusResponse cancel(String jobId) {
@@ -117,6 +129,8 @@ public class AnalysisJobService {
             checkCancelled(job);
 
             List<Path> storedFiles = storeFiles(job, files);
+            job.inputName(describeInput(storedFiles));
+            job.inputHash(hashInputs(storedFiles));
             publish(job, ProgressEventType.PROGRESS, ProgressPhase.VALIDATING_UPLOAD, "Validated upload", 15, null, 0, storedFiles.size());
             checkCancelled(job);
 
@@ -176,16 +190,19 @@ public class AnalysisJobService {
             job.status(JobStatus.COMPLETED);
             job.completedAt(result.completedAt());
             job.message("Completed");
+            scanHistoryService.persistCompletedScan(job);
             publish(job, ProgressEventType.COMPLETED, ProgressPhase.COMPLETED, "Analysis completed", 100, null, artifacts.size(), artifacts.size());
         } catch (JobCancelledException ex) {
             job.status(JobStatus.CANCELLED);
             job.completedAt(Instant.now());
             job.message(ex.getMessage());
+            scanHistoryService.persistTerminalMetadata(job);
         } catch (Exception ex) {
             job.status(JobStatus.FAILED);
             job.completedAt(Instant.now());
             job.message("Analysis failed");
             job.errors().add(ex.getMessage());
+            scanHistoryService.persistTerminalMetadata(job);
             publish(job, ProgressEventType.ERROR, ProgressPhase.FAILED, ex.getMessage(), null, null, null, null);
         } finally {
             JobDirectories.deleteQuietly(job.workspaceDir());
@@ -275,5 +292,33 @@ public class AnalysisJobService {
         }
         int start = Math.max(line.lastIndexOf('/', jarIndex), line.lastIndexOf('\\', jarIndex));
         return line.substring(start + 1, jarIndex + 4);
+    }
+
+    private String describeInput(List<Path> storedFiles) {
+        if (storedFiles.isEmpty()) {
+            return null;
+        }
+        if (storedFiles.size() == 1) {
+            return storedFiles.getFirst().getFileName().toString();
+        }
+        return storedFiles.getFirst().getFileName() + " (+" + (storedFiles.size() - 1) + " more)";
+    }
+
+    private String hashInputs(List<Path> storedFiles) throws IOException {
+        if (storedFiles.isEmpty()) {
+            return null;
+        }
+        if (storedFiles.size() == 1) {
+            return HashUtils.sha256(storedFiles.getFirst());
+        }
+
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        for (Path path : storedFiles) {
+            outputStream.write(path.getFileName().toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            outputStream.write(':');
+            outputStream.write(HashUtils.sha256(path).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            outputStream.write('\n');
+        }
+        return HashUtils.sha256(outputStream.toByteArray());
     }
 }

@@ -11,7 +11,9 @@ class MavenResolutionServiceTests {
 
     private final MavenResolutionService mavenResolutionService = new MavenResolutionService(
             new JarScanProperties(
+                    "0.1.0-test",
                     "/tmp/jarscan-tests",
+                    "/tmp/jarscan-tests/jarscan.db",
                     "dependency-check.sh",
                     4,
                     10_000_000,
