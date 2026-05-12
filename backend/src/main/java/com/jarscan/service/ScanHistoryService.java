@@ -111,13 +111,13 @@ public class ScanHistoryService {
     }
 
     public List<StoredScanSummaryResponse> listScans(ScanSearchCriteria criteria) {
-        return repository.findAll(criteria).stream().map(this::toSummary).toList();
+        return repository.findAll(criteria).stream().map(this::toSummaryResponse).toList();
     }
 
     public StoredScanResponse getStoredScan(String scanId) {
         PersistedScanRecord record = repository.findById(scanId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown scan: " + scanId));
-        return new StoredScanResponse(toSummary(record), record.result());
+        return new StoredScanResponse(toSummaryResponse(record), record.result());
     }
 
     public Optional<AnalysisResult> findResultByJobId(String jobId) {
@@ -146,11 +146,11 @@ public class ScanHistoryService {
 
     public StoredScanSummaryResponse updateMetadata(String scanId, UpdateStoredScanRequest request) {
         return repository.updateMetadata(scanId, new StoredScanMetadataUpdate(request.notes(), normalizeTags(request.tags())))
-                .map(this::toSummary)
+                .map(this::toSummaryResponse)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown scan: " + scanId));
     }
 
-    private StoredScanSummaryResponse toSummary(PersistedScanRecord record) {
+    public StoredScanSummaryResponse toSummaryResponse(PersistedScanRecord record) {
         return new StoredScanSummaryResponse(
                 record.id(),
                 record.jobId(),

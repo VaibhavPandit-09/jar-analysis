@@ -215,3 +215,93 @@ export interface UpdateStoredScanPayload {
   notes?: string | null;
   tags?: string[];
 }
+
+export type DependencyChangeType = "ADDED" | "REMOVED" | "UPDATED" | "UNCHANGED";
+export type VulnerabilityChangeType = "NEW" | "FIXED" | "CHANGED" | "UNCHANGED";
+
+export interface CountDiff {
+  before: number;
+  after: number;
+  delta: number;
+}
+
+export interface DoubleDiff {
+  before: number | null;
+  after: number | null;
+  delta: number | null;
+}
+
+export interface ScanComparisonSummaryDiff {
+  totalArtifacts: CountDiff;
+  totalDependencies: CountDiff;
+  totalVulnerabilities: CountDiff;
+  critical: CountDiff;
+  high: CountDiff;
+  medium: CountDiff;
+  low: CountDiff;
+  highestCvss: DoubleDiff;
+  beforePolicyStatus: string | null;
+  afterPolicyStatus: string | null;
+  licenseCount: CountDiff | null;
+}
+
+export interface DependencyChangeItem {
+  changeType: DependencyChangeType;
+  artifactKey: string;
+  oldGroupId: string | null;
+  oldArtifactId: string | null;
+  newGroupId: string | null;
+  newArtifactId: string | null;
+  oldVersion: string | null;
+  newVersion: string | null;
+  oldJavaVersion: string | null;
+  newJavaVersion: string | null;
+  oldVulnerabilityCount: number | null;
+  newVulnerabilityCount: number | null;
+  scope: string | null;
+  coordinatesChanged: boolean;
+  versionChanged: boolean;
+  javaVersionChanged: boolean;
+  vulnerabilityCountChanged: boolean;
+}
+
+export interface VulnerabilityChangeItem {
+  changeType: VulnerabilityChangeType;
+  vulnerabilityId: string;
+  cveId: string | null;
+  oldSeverity: Severity | null;
+  newSeverity: Severity | null;
+  oldCvss: number | null;
+  newCvss: number | null;
+  dependencyKey: string;
+  dependencyGroupId: string | null;
+  dependencyArtifactId: string | null;
+  oldDependencyVersion: string | null;
+  newDependencyVersion: string | null;
+}
+
+export interface DependencyComparisonSection {
+  addedCount: number;
+  removedCount: number;
+  updatedCount: number;
+  unchangedCount: number;
+  changes: DependencyChangeItem[];
+}
+
+export interface VulnerabilityComparisonSection {
+  newCount: number;
+  fixedCount: number;
+  changedCount: number;
+  unchangedCount: number;
+  changes: VulnerabilityChangeItem[];
+}
+
+export interface ScanComparisonResponse {
+  baseline: StoredScanSummary;
+  target: StoredScanSummary;
+  summaryDiff: ScanComparisonSummaryDiff;
+  dependencyChanges: DependencyComparisonSection;
+  vulnerabilityChanges: VulnerabilityComparisonSection;
+  warnings: string[];
+  errors: string[];
+}

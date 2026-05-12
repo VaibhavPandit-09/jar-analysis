@@ -6,6 +6,7 @@ import { ResultsPage } from "@/pages/results-page";
 import { ScanHistoryPage } from "@/pages/scan-history-page";
 import { SettingsPage } from "@/pages/settings-page";
 import { UploadPage } from "@/pages/upload-page";
+import { ComparePage } from "@/pages/compare-page";
 
 const router = createBrowserRouter([
   {
@@ -14,6 +15,7 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <UploadPage /> },
       { path: "scan-history", element: <ScanHistoryPage /> },
+      { path: "compare", element: <ComparePage /> },
       { path: "settings", element: <SettingsPage /> },
       { path: "jobs/:jobId", element: <JobProgressPage /> },
       { path: "jobs/:jobId/results", element: <ResultsPage /> },

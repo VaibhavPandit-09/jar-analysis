@@ -68,6 +68,18 @@ Exports currently operate against the existing job/result model. The Session 3 h
     - `notes`
     - `tags`
 
+### Scan Comparison API
+
+- `GET /api/compare?base={scanId}&target={scanId}`
+  - compares two persisted scans
+  - response includes:
+    - baseline scan summary
+    - target scan summary
+    - summary before/after diffs
+    - dependency changes (`ADDED`/`REMOVED`/`UPDATED`/`UNCHANGED`)
+    - vulnerability changes (`NEW`/`FIXED`/`CHANGED`/`UNCHANGED`)
+    - warnings/errors for partial comparison scenarios
+
 ## Current Frontend Route Surface That Depends On These APIs
 
 - `/`
@@ -129,19 +141,11 @@ The following response DTOs are visible or directly implied by controller/servic
 - `StoredScanSummaryResponse`
 - `StoredScanResponse`
 
-## Planned v2 Comparison Endpoints
+## Session 5 Comparison Status
 
-Expected direction for Session 5:
+Implemented endpoint:
 
-- `GET /api/scans/compare?left={scanId}&right={scanId}`
-- or `POST /api/scans/compare`
-
-Possible outputs:
-
-- dependency additions and removals
-- version changes
-- vulnerability deltas
-- policy delta summaries
+- `GET /api/compare?base={scanId}&target={scanId}`
 
 ## Planned v2 Settings Endpoints
 

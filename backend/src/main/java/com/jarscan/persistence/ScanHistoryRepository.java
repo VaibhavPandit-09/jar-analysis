@@ -270,7 +270,7 @@ public class ScanHistoryRepository {
         try {
             return objectMapper.readValue(resultJson, AnalysisResult.class);
         } catch (JsonProcessingException ex) {
-            throw new IllegalStateException("Unable to deserialize stored scan result", ex);
+            return null;
         }
     }
 

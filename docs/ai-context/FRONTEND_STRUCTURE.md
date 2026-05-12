@@ -7,6 +7,7 @@ Current visible routes:
 - `/`
 - `/scan-history`
 - `/settings`
+- `/compare`
 - `/jobs/:jobId`
 - `/jobs/:jobId/results`
 - `/scans/:scanId/results`
@@ -55,6 +56,16 @@ These routes are defined in `frontend/src/App.tsx`.
 - shows Dependency-Check DB status details
 - starts manual DB sync
 - subscribes to `/api/vulnerability-db/events` for live sync logs
+
+### `ComparePage`
+
+- route: `/compare`
+- supports URL-driven comparison parameters: `?base={scanId}&target={scanId}`
+- fetches persisted scans for baseline/target selection
+- renders summary before/after cards with directional deltas
+- renders dependency change table and vulnerability change table
+- displays loading, empty, and error states
+- scan history integrates with this flow via baseline selection and compare actions
 
 ## Shared Components
 

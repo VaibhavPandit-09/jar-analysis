@@ -10,6 +10,7 @@ import com.jarscan.dto.ManifestInfo;
 import com.jarscan.dto.MavenCoordinates;
 import com.jarscan.dto.StoredScanResponse;
 import com.jarscan.dto.StoredScanSummaryResponse;
+import com.jarscan.dto.VulnerabilityFinding;
 import com.jarscan.job.AnalysisJob;
 import com.jarscan.model.InputType;
 import com.jarscan.model.JobStatus;
@@ -30,6 +31,7 @@ import java.nio.file.Files;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -163,6 +165,83 @@ class ScanHistoryPersistenceTests {
         assertThat(deserialized.summary().requiredJavaVersion()).isEqualTo("Java 17");
     }
 
+    @Test
+    void comparesScansForAddedRemovedAndUpdatedDependenciesAndVulnerabilities() throws Exception {
+        scanHistoryService.persistCompletedScan(buildJobWithSingleArtifact(
+                "job-base",
+                "base.jar",
+                "hash-base",
+                "com.example",
+                "demo",
+                "1.0.0",
+                "Java 17",
+                List.of(new VulnerabilityFinding(Severity.HIGH, "CVE-2026-0001", 7.5, "pkg:maven/com.example/demo@1.0.0", "1.0.0", null, null, List.of(), "dc"))
+        ));
+        scanHistoryService.persistCompletedScan(buildJobWithSingleArtifact(
+                "job-target",
+                "target.jar",
+                "hash-target",
+                "com.example",
+                "demo",
+                "2.0.0",
+                "Java 21",
+                List.of(new VulnerabilityFinding(Severity.CRITICAL, "CVE-2026-0002", 9.8, "pkg:maven/com.example/demo@2.0.0", "2.0.0", null, null, List.of(), "dc"))
+        ));
+
+        String baseId = scanHistoryRepository.findByJobId("job-base").orElseThrow().id();
+        String targetId = scanHistoryRepository.findByJobId("job-target").orElseThrow().id();
+
+        mockMvc.perform(get("/api/compare")
+                        .queryParam("base", baseId)
+                        .queryParam("target", targetId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.summaryDiff.totalArtifacts.before").value(1))
+                .andExpect(jsonPath("$.summaryDiff.totalArtifacts.after").value(1))
+                .andExpect(jsonPath("$.summaryDiff.totalVulnerabilities.before").value(1))
+                .andExpect(jsonPath("$.summaryDiff.totalVulnerabilities.after").value(1))
+                .andExpect(jsonPath("$.dependencyChanges.updatedCount").value(1))
+                .andExpect(jsonPath("$.vulnerabilityChanges.newCount").value(1))
+                .andExpect(jsonPath("$.vulnerabilityChanges.fixedCount").value(1));
+    }
+
+    @Test
+    void compareEndpointReturnsNotFoundForMissingScan() throws Exception {
+        mockMvc.perform(get("/api/compare")
+                        .queryParam("base", "missing-base")
+                        .queryParam("target", "missing-target"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void compareEndpointHandlesMalformedStoredResultJson() throws Exception {
+        String malformedId = UUID.randomUUID().toString();
+        jdbcTemplate.update("""
+                        INSERT INTO scans (
+                            id, job_id, input_type, input_name, input_hash, status,
+                            started_at, completed_at, duration_ms,
+                            total_artifacts, total_dependencies, total_vulnerabilities,
+                            critical_count, high_count, medium_count, low_count, info_count, unknown_count,
+                            highest_cvss, required_java_version, created_app_version,
+                            notes, tags, result_json, created_at, updated_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                malformedId, "job-malformed", "ARCHIVE_UPLOAD", "bad.jar", "hash-bad", "COMPLETED",
+                "2026-05-12T12:00:00Z", "2026-05-12T12:01:00Z", 60000L,
+                1, 1, 1, 0, 1, 0, 0, 0, 0, 5.0, "Java 17", "test",
+                null, "[]", "{not-valid-json", "2026-05-12T12:01:00Z", "2026-05-12T12:01:00Z");
+
+        AnalysisJob goodJob = completedJob("job-good", "good.jar", "hash-good");
+        scanHistoryService.persistCompletedScan(goodJob);
+        String goodId = scanHistoryRepository.findByJobId("job-good").orElseThrow().id();
+
+        mockMvc.perform(get("/api/compare")
+                        .queryParam("base", malformedId)
+                        .queryParam("target", goodId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.warnings[0]").value("Baseline scan has no readable result JSON."))
+                .andExpect(jsonPath("$.dependencyChanges.changes.length()").value(0));
+    }
+
     private AnalysisJob completedJob(String jobId, String inputName, String inputHash) {
         AnalysisJob job = new AnalysisJob(jobId, InputType.ARCHIVE_UPLOAD, tempWorkspace());
         Instant startedAt = Instant.parse("2026-05-12T12:00:00Z");
@@ -211,6 +290,71 @@ class ScanHistoryPersistenceTests {
                 List.of(),
                 List.of()
         );
+    }
+
+    private AnalysisJob buildJobWithSingleArtifact(
+            String jobId,
+            String inputName,
+            String inputHash,
+            String groupId,
+            String artifactId,
+            String version,
+            String javaVersion,
+            List<VulnerabilityFinding> vulnerabilities
+    ) {
+        AnalysisJob job = new AnalysisJob(jobId, InputType.ARCHIVE_UPLOAD, tempWorkspace());
+        Instant startedAt = Instant.parse("2026-05-12T13:00:00Z");
+        Instant completedAt = Instant.parse("2026-05-12T13:02:00Z");
+        job.status(JobStatus.COMPLETED);
+        job.startedAt(startedAt);
+        job.completedAt(completedAt);
+        job.inputName(inputName);
+        job.inputHash(inputHash);
+        ArtifactAnalysis artifact = new ArtifactAnalysis(
+                "artifact-" + jobId,
+                inputName,
+                4096,
+                "sha-" + jobId,
+                11,
+                false,
+                null,
+                0,
+                new MavenCoordinates(groupId, artifactId, version),
+                new JavaVersionInfo(null, null, javaVersion, false),
+                new ManifestInfo(null, null, null, null, null, null, null, null, Map.of()),
+                ModuleType.CLASSPATH_JAR,
+                vulnerabilities.isEmpty() ? Severity.UNKNOWN : vulnerabilities.getFirst().severity(),
+                vulnerabilities.size(),
+                List.of(),
+                vulnerabilities,
+                List.of(),
+                Map.of()
+        );
+        job.result(new AnalysisResult(
+                jobId,
+                JobStatus.COMPLETED,
+                InputType.ARCHIVE_UPLOAD,
+                startedAt,
+                completedAt,
+                new AnalysisSummary(1, 1, vulnerabilities.isEmpty() ? 0 : 1, vulnerabilities.size(),
+                        countSeverity(vulnerabilities, Severity.CRITICAL),
+                        countSeverity(vulnerabilities, Severity.HIGH),
+                        countSeverity(vulnerabilities, Severity.MEDIUM),
+                        countSeverity(vulnerabilities, Severity.LOW),
+                        countSeverity(vulnerabilities, Severity.INFO),
+                        countSeverity(vulnerabilities, Severity.UNKNOWN),
+                        vulnerabilities.stream().map(VulnerabilityFinding::cvssScore).filter(java.util.Objects::nonNull).max(Double::compareTo).orElse(null),
+                        javaVersion),
+                List.of(artifact),
+                null,
+                List.of(),
+                List.of()
+        ));
+        return job;
+    }
+
+    private int countSeverity(List<VulnerabilityFinding> vulnerabilities, Severity severity) {
+        return (int) vulnerabilities.stream().filter(finding -> finding.severity() == severity).count();
     }
 
     private java.nio.file.Path tempWorkspace() {

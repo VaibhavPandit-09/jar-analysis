@@ -3,11 +3,13 @@ package com.jarscan.controller;
 import com.jarscan.dto.StoredScanResponse;
 import com.jarscan.dto.StoredScanSummaryResponse;
 import com.jarscan.dto.UpdateStoredScanRequest;
+import com.jarscan.dto.ScanComparisonResponse;
 import com.jarscan.model.InputType;
 import com.jarscan.model.JobStatus;
 import com.jarscan.model.Severity;
 import com.jarscan.persistence.ScanSearchCriteria;
 import com.jarscan.service.ScanHistoryService;
+import com.jarscan.service.ScanComparisonService;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,9 +27,11 @@ import java.util.List;
 public class ScanHistoryController {
 
     private final ScanHistoryService scanHistoryService;
+    private final ScanComparisonService scanComparisonService;
 
-    public ScanHistoryController(ScanHistoryService scanHistoryService) {
+    public ScanHistoryController(ScanHistoryService scanHistoryService, ScanComparisonService scanComparisonService) {
         this.scanHistoryService = scanHistoryService;
+        this.scanComparisonService = scanComparisonService;
     }
 
     @GetMapping
@@ -47,6 +51,14 @@ public class ScanHistoryController {
     @GetMapping("/{scanId}")
     public StoredScanResponse getScan(@PathVariable String scanId) {
         return scanHistoryService.getStoredScan(scanId);
+    }
+
+    @GetMapping("/compare")
+    public ScanComparisonResponse compareScans(
+            @RequestParam("base") String baselineScanId,
+            @RequestParam("target") String targetScanId
+    ) {
+        return scanComparisonService.compareScans(baselineScanId, targetScanId);
     }
 
     @DeleteMapping("/{scanId}")

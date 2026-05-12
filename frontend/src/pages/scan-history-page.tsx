@@ -9,7 +9,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -130,6 +130,8 @@ export function ScanHistoryPage() {
   const [savingScanId, setSavingScanId] = useState<string | null>(null);
   const [scanToDelete, setScanToDelete] = useState<StoredScanSummary | null>(null);
   const [deletingScanId, setDeletingScanId] = useState<string | null>(null);
+  const [compareBaselineId, setCompareBaselineId] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     let cancelled = false;
@@ -392,6 +394,22 @@ export function ScanHistoryPage() {
                         <Button variant="outline" onClick={() => beginEdit(scan)}>
                           <PencilLine className="mr-2 h-4 w-4" />
                           Edit notes
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            if (!compareBaselineId || compareBaselineId === scan.scanId) {
+                              setCompareBaselineId(scan.scanId);
+                              return;
+                            }
+                            navigate(`/compare?base=${compareBaselineId}&target=${scan.scanId}`);
+                          }}
+                        >
+                          {compareBaselineId === scan.scanId
+                            ? "Baseline selected"
+                            : compareBaselineId
+                              ? "Compare to baseline"
+                              : "Set baseline"}
                         </Button>
                         <Button variant="outline" onClick={() => setScanToDelete(scan)}>
                           <Trash2 className="mr-2 h-4 w-4" />

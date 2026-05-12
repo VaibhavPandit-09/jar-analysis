@@ -55,6 +55,11 @@ Current package layout under `backend/src/main/java/com/jarscan`:
 
 - forwards SPA routes for deep-link refresh support
 
+### `ScanComparisonController`
+
+- compare two persisted scans via `GET /api/compare?base={scanId}&target={scanId}`
+- delegates comparison logic to service layer
+
 ## Service Responsibilities
 
 ### `AnalysisJobService`
@@ -76,6 +81,14 @@ Current package layout under `backend/src/main/java/com/jarscan`:
 - stores full `result_json`
 - looks up persisted result and status by `jobId`
 - supports history list, detail, delete, and metadata update operations
+
+### `ScanComparisonService`
+
+- loads baseline and target persisted scans
+- compares flattened artifacts/dependencies using coordinate-first identity (`groupId:artifactId`) with file/hash fallback keys
+- detects dependency additions, removals, version changes, coordinate changes, Java version changes, and vulnerability-count changes
+- compares vulnerability deltas (`NEW`, `FIXED`, `CHANGED`, `UNCHANGED`) using CVE+artifact identity with fallback ID logic
+- returns before/after summary count diffs plus warnings for partial/malformed persisted results
 
 ### `JarAnalyzerService`
 

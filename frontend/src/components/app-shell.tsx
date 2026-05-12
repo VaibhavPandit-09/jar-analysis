@@ -91,6 +91,7 @@ export function AppShell() {
                 {[
                   { to: "/", label: "Upload", end: true },
                   { to: "/scan-history", label: "Scan History" },
+                  { to: "/compare", label: "Compare" },
                   { to: "/settings", label: "Settings" },
                 ].map((item) => (
                   <NavLink

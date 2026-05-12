@@ -14,6 +14,7 @@ JARScan is a personal web-based Java artifact analyzer for `.jar`, `.war`, `.ear
 - Optional NVD API key settings with masked local storage
 - JSON, Markdown, and HTML report export
 - Persistent scan history with reopen, notes/tags, and delete actions
+- Scan comparison between persisted scans with dependency and vulnerability deltas
 - Light, dark, and system theme support
 
 ## AI Maintainer Context
@@ -83,6 +84,7 @@ Completed scans are stored in a local SQLite database so history survives contai
 - Deleting Docker volumes with `docker compose down -v` also deletes stored scan history
 - The frontend exposes this history at `/scan-history`
 - Reopened scans render in the same results dashboard used for fresh job results
+- Scan comparison UI is available at `/compare` and can be launched from scan history
 
 ## NVD API Key And Vulnerability DB Settings
 

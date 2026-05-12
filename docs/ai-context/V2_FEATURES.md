@@ -100,7 +100,8 @@ This file documents the planned JARScan v2 feature set. These items are roadmap 
 ## Scan Comparison
 
 - compare two persisted scans
-- highlight dependency additions/removals, version changes, and vulnerability deltas
+- highlight before/after dependency additions/removals/updates and unchanged entries
+- highlight vulnerability deltas including new, fixed, changed severity/CVSS, and unchanged findings
 
 ## UI Upgrades
 

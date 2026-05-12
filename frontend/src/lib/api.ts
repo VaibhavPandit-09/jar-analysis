@@ -3,6 +3,7 @@ import type {
   AnalysisResult,
   NvdSettingsStatus,
   NvdSettingsTestResponse,
+  ScanComparisonResponse,
   StoredScan,
   StoredScanQuery,
   StoredScanSummary,
@@ -122,4 +123,9 @@ export async function updateStoredScan(scanId: string, payload: UpdateStoredScan
       body: JSON.stringify(payload),
     }),
   );
+}
+
+export async function fetchScanComparison(baseScanId: string, targetScanId: string) {
+  const params = new URLSearchParams({ base: baseScanId, target: targetScanId });
+  return parseJson<ScanComparisonResponse>(await fetch(`/api/compare?${params.toString()}`));
 }
