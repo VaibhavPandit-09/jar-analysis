@@ -13,6 +13,7 @@ import com.jarscan.model.InputType;
 import com.jarscan.model.JobStatus;
 import com.jarscan.model.ProgressEventType;
 import com.jarscan.model.ProgressPhase;
+import com.jarscan.util.AnalysisSummaryFactory;
 import com.jarscan.util.FilenameSanitizer;
 import com.jarscan.util.JobDirectories;
 import org.springframework.http.HttpStatus;
@@ -165,20 +166,7 @@ public class AnalysisJobService {
                     job.inputType(),
                     job.startedAt(),
                     Instant.now(),
-                    new AnalysisSummary(
-                            artifacts.size(),
-                            0,
-                            0,
-                            0,
-                            0,
-                            0,
-                            0,
-                            0,
-                            0,
-                            0,
-                            null,
-                            "Unknown"
-                    ),
+                    AnalysisSummaryFactory.create(job.inputType(), artifacts),
                     artifacts,
                     dependencyTreeText,
                     List.copyOf(job.warnings()),

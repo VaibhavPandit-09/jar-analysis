@@ -4,7 +4,11 @@ import com.jarscan.dto.AnalysisJobResponse;
 import com.jarscan.dto.AnalysisJobStatusResponse;
 import com.jarscan.dto.AnalysisResult;
 import com.jarscan.service.AnalysisJobService;
+import com.jarscan.service.ReportExportService;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,9 +25,11 @@ import java.util.List;
 public class JobController {
 
     private final AnalysisJobService analysisJobService;
+    private final ReportExportService reportExportService;
 
-    public JobController(AnalysisJobService analysisJobService) {
+    public JobController(AnalysisJobService analysisJobService, ReportExportService reportExportService) {
         this.analysisJobService = analysisJobService;
+        this.reportExportService = reportExportService;
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
@@ -46,8 +52,25 @@ public class JobController {
         return analysisJobService.getResult(jobId);
     }
 
+    @GetMapping(path = "/{jobId}/export")
+    public ResponseEntity<byte[]> exportReport(@PathVariable String jobId, @RequestParam(defaultValue = "json") String format) {
+        AnalysisResult result = analysisJobService.getResult(jobId);
+        byte[] content = reportExportService.export(result, format);
+        return ResponseEntity.status(HttpStatus.OK)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"jarscan-%s.%s\"".formatted(jobId, extension(format)))
+                .contentType(reportExportService.mediaType(format))
+                .body(content);
+    }
+
     @PostMapping(path = "/{jobId}/cancel", produces = MediaType.APPLICATION_JSON_VALUE)
     public AnalysisJobStatusResponse cancelJob(@PathVariable String jobId) {
         return analysisJobService.cancel(jobId);
+    }
+
+    private String extension(String format) {
+        return switch (format.toLowerCase()) {
+            case "markdown" -> "md";
+            default -> format.toLowerCase();
+        };
     }
 }
