@@ -14,6 +14,15 @@ JARScan is a personal web-based Java artifact analyzer for `.jar`, `.war`, `.ear
 - JSON, Markdown, and HTML report export
 - Light, dark, and system theme support
 
+## AI Maintainer Context
+
+Before making broad changes, future AI agents should read:
+
+- `docs/ai-context/PROJECT_OVERVIEW.md`
+- `docs/ai-context/ARCHITECTURE.md`
+- `docs/ai-context/DESIGN_DECISIONS.md`
+- `docs/ai-context/NEXT_STEPS.md`
+
 ## Screenshots
 
 - Placeholder: upload screen

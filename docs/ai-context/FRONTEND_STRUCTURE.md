@@ -1,0 +1,151 @@
+# Frontend Structure
+
+## Route Structure
+
+Current visible routes:
+
+- `/`
+- `/jobs/:jobId`
+- `/jobs/:jobId/results`
+
+These routes are defined in `frontend/src/App.tsx`.
+
+## Main Pages
+
+### `UploadPage`
+
+- landing page
+- manages file selection state
+- validates the upload mix
+- starts jobs through `/api/jobs`
+
+### `JobProgressPage`
+
+- polls job status
+- subscribes to `/api/jobs/{jobId}/events`
+- renders progress bar, phase timeline, live log panel, and cancel action
+
+### `ResultsPage`
+
+- fetches `/api/jobs/{jobId}/result`
+- renders summary cards
+- renders severity rollups
+- shows artifact accordions with tabs
+- supports export links
+- shows dependency-tree text when present
+
+## Shared Components
+
+Visible app-level shared components:
+
+- `AppShell`
+- `UploadZone`
+- `theme-provider`
+- `theme-toggle`
+
+`AppShell` currently owns:
+
+- page chrome
+- app header
+- DB status indicator
+- DB sync button
+- routed content outlet
+
+## UI Component System
+
+Current UI kit is lightweight and local to the repo.
+
+Visible components under `src/components/ui`:
+
+- `accordion`
+- `badge`
+- `button`
+- `card`
+- `progress`
+- `tabs`
+- `tooltip`
+
+This is effectively a shadcn-style component layer built from Radix primitives plus local styling helpers.
+
+## Theme Handling
+
+Theme handling uses:
+
+- `next-themes`
+- `ThemeProvider`
+- `ThemeToggle`
+- CSS custom properties in `src/index.css`
+
+Supported modes:
+
+- light
+- dark
+- system
+
+Theme preference is intended to persist locally in browser storage.
+
+## API Client Structure
+
+Current API helpers live in:
+
+- `src/lib/api.ts`
+
+Visible request helpers include:
+
+- `createAnalysisJob`
+- `fetchJobStatus`
+- `fetchJobResult`
+- `cancelJob`
+- `fetchVulnerabilityDbStatus`
+- `syncVulnerabilityDb`
+
+Current shared frontend typing lives in:
+
+- `src/lib/types.ts`
+
+## SSE Handling
+
+Current SSE behavior is page-local rather than abstracted into a dedicated hook.
+
+Visible behavior:
+
+- `JobProgressPage` opens `EventSource` against `/api/jobs/{jobId}/events`
+- listens for `STARTED`, `PROGRESS`, `LOG`, `WARNING`, `ERROR`, `COMPLETED`, `CANCELLED`
+- appends incoming events into local component state
+
+There is currently no reusable SSE hook or centralized event-state store.
+
+## Results Dashboard Structure
+
+Current results page structure:
+
+- top summary cards
+- severity summary cards
+- filters for text query and severity
+- artifact accordion list
+- per-artifact tabs:
+  - overview
+  - manifest
+  - dependencies
+  - vulnerabilities
+  - raw metadata
+- optional dependency-tree block
+- export actions for JSON, Markdown, and HTML
+
+## Planned v2 UI Pages
+
+Future sessions are expected to add pages or major UI surfaces for:
+
+- scan history
+- reopened scan details from persisted storage
+- settings / NVD API key configuration
+- Dependency-Check DB status and manual sync management
+- scan comparison
+- dependency tree visualization
+- path-to-dependency explorer
+- version conflict / convergence analysis
+- unused dependency analysis and dependency slimming advice
+- suppressions and policy management
+- SBOM import/export workflows
+
+When adding those screens, future sessions should reuse the current `AppShell`, `src/lib/types.ts`, and shared UI components where practical rather than building a second design system.
