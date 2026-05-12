@@ -29,22 +29,9 @@ public class MavenResolutionService {
         Path workingDirectory = pomPath.getParent();
         Path dependencyDir = java.nio.file.Files.createDirectories(workingDirectory.resolve("resolved-deps"));
 
-        runCommand(job, workingDirectory, logConsumer, List.of(
-                "mvn",
-                "-f", pomPath.toString(),
-                "dependency:copy-dependencies",
-                "-DoutputDirectory=" + dependencyDir,
-                "-DincludeScope=" + scope,
-                "-Dmdep.useRepositoryLayout=false",
-                "-DskipTests"
-        ));
+        runCommand(job, workingDirectory, logConsumer, buildCopyDependenciesCommand(pomPath, dependencyDir, scope));
 
-        String dependencyTree = runCommand(job, workingDirectory, logConsumer, List.of(
-                "mvn",
-                "-f", pomPath.toString(),
-                "dependency:tree",
-                "-DoutputType=text"
-        ));
+        String dependencyTree = runCommand(job, workingDirectory, logConsumer, buildDependencyTreeCommand(pomPath));
 
         List<Path> artifacts = new ArrayList<>();
         try (var paths = java.nio.file.Files.list(dependencyDir)) {
@@ -57,6 +44,27 @@ public class MavenResolutionService {
         }
 
         return new MavenResolutionResult(artifacts, dependencyTree);
+    }
+
+    List<String> buildCopyDependenciesCommand(Path pomPath, Path dependencyDir, String scope) {
+        return List.of(
+                "mvn",
+                "-f", pomPath.toString(),
+                "dependency:copy-dependencies",
+                "-DoutputDirectory=" + dependencyDir,
+                "-DincludeScope=" + scope,
+                "-Dmdep.useRepositoryLayout=false",
+                "-DskipTests"
+        );
+    }
+
+    List<String> buildDependencyTreeCommand(Path pomPath) {
+        return List.of(
+                "mvn",
+                "-f", pomPath.toString(),
+                "dependency:tree",
+                "-DoutputType=text"
+        );
     }
 
     private String runCommand(
