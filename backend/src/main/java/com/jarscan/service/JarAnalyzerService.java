@@ -19,11 +19,15 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.UUID;
 import java.util.jar.Attributes;
 import java.util.jar.JarFile;
 import java.util.jar.Manifest;
 import java.util.zip.ZipEntry;
+
+import javax.xml.XMLConstants;
+import javax.xml.parsers.DocumentBuilderFactory;
 
 @Service
 public class JarAnalyzerService {
@@ -36,12 +40,16 @@ public class JarAnalyzerService {
             List<String> sampleEntries = new ArrayList<>();
             Integer minMajor = null;
             Integer maxMajor = null;
+            MavenCoordinates coordinates = new MavenCoordinates(null, null, null);
             var entries = jarFile.entries();
             while (entries.hasMoreElements()) {
                 ZipEntry entry = entries.nextElement();
                 entryCount++;
                 if (sampleEntries.size() < 12 && !entry.isDirectory()) {
                     sampleEntries.add(entry.getName());
+                }
+                if (!coordinates.isKnown() && entry.getName().startsWith("META-INF/maven/")) {
+                    coordinates = readCoordinates(jarFile, entry, coordinates);
                 }
                 if ("module-info.class".equals(entry.getName())) {
                     moduleInfoPresent = true;
@@ -72,7 +80,7 @@ public class JarAnalyzerService {
                     fatJar,
                     null,
                     0,
-                    new MavenCoordinates(null, null, null),
+                    coordinates,
                     new JavaVersionInfo(minMajor, maxMajor, JavaVersionMapper.describe(maxMajor), multiRelease),
                     manifestInfo,
                     moduleType,
@@ -84,7 +92,8 @@ public class JarAnalyzerService {
                     Map.of(
                             "archiveType", archiveType(path),
                             "sampleEntries", sampleEntries,
-                            "moduleInfoPresent", moduleInfoPresent
+                            "moduleInfoPresent", moduleInfoPresent,
+                            "coordinatesKnown", coordinates.isKnown()
                     )
             );
         }
@@ -144,5 +153,57 @@ public class JarAnalyzerService {
             return ModuleType.AUTOMATIC_MODULE;
         }
         return ModuleType.CLASSPATH_JAR;
+    }
+
+    private MavenCoordinates readCoordinates(JarFile jarFile, ZipEntry entry, MavenCoordinates current) throws IOException {
+        String name = entry.getName();
+        if (name.endsWith("pom.properties")) {
+            try (InputStream inputStream = jarFile.getInputStream(entry)) {
+                Properties properties = new Properties();
+                properties.load(inputStream);
+                return new MavenCoordinates(
+                        properties.getProperty("groupId"),
+                        properties.getProperty("artifactId"),
+                        properties.getProperty("version")
+                );
+            }
+        }
+        if (name.endsWith("pom.xml")) {
+            try (InputStream inputStream = jarFile.getInputStream(entry)) {
+                return parsePomXml(inputStream, current);
+            }
+        }
+        return current;
+    }
+
+    private MavenCoordinates parsePomXml(InputStream inputStream, MavenCoordinates fallback) {
+        try {
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+            factory.setNamespaceAware(false);
+            var builder = factory.newDocumentBuilder();
+            var document = builder.parse(inputStream);
+            var project = document.getDocumentElement();
+            String groupId = textContent(project, "groupId");
+            String artifactId = textContent(project, "artifactId");
+            String version = textContent(project, "version");
+            return new MavenCoordinates(
+                    groupId != null ? groupId : fallback.groupId(),
+                    artifactId != null ? artifactId : fallback.artifactId(),
+                    version != null ? version : fallback.version()
+            );
+        } catch (Exception ex) {
+            return fallback;
+        }
+    }
+
+    private String textContent(org.w3c.dom.Element element, String tagName) {
+        var nodes = element.getElementsByTagName(tagName);
+        if (nodes.getLength() == 0) {
+            return null;
+        }
+        String text = nodes.item(0).getTextContent();
+        return text == null || text.isBlank() ? null : text.trim();
     }
 }
