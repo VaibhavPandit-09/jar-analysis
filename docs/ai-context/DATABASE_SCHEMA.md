@@ -16,6 +16,7 @@ What still persists outside SQLite:
 
 - Maven cache in `/root/.m2`
 - Dependency-Check cache in `/app/data/dependency-check`
+- raw NVD API key in `/app/data/secrets/nvd-api-key`
 
 What is still in-memory:
 
@@ -63,6 +64,28 @@ Important constraints and indexes:
 - index on `input_type`
 - index on `completed_at`
 
+## Current `app_settings` Table
+
+Session 4 adds a general-purpose `app_settings` table.
+
+Columns:
+
+- `key`
+- `value`
+- `encrypted`
+- `created_at`
+- `updated_at`
+
+Current uses:
+
+- NVD API key metadata such as masked suffix
+- vulnerability DB sync metadata such as last sync status and duration
+
+Important note:
+
+- the raw NVD API key is not stored in SQLite
+- the `encrypted` column exists for future evolution, but the current NVD secret strategy stores the raw key in a restricted local file instead
+
 ## Summary Columns Plus `result_json` Approach
 
 JARScan intentionally stores both:
@@ -72,19 +95,13 @@ JARScan intentionally stores both:
 
 This keeps the first persistence layer maintainable without immediately normalizing every nested artifact, dependency, or vulnerability into separate tables.
 
-## Planned `app_settings` Table
+## App Settings Direction
 
-Likely direction for Session 4 and later:
+Additional likely settings for future sessions:
 
-- `key`
-- `value`
-- `updated_at`
-
-Likely settings:
-
-- NVD API key
 - default Maven dependency scope
 - UI and scan defaults as needed
+- future policy or suppression preferences
 
 ## Planned `suppressions` Table
 
@@ -125,7 +142,9 @@ Likely direction for Session 10:
 Current schema management:
 
 - Flyway is enabled in the backend
-- the initial migration creates the `scans` table
+- migrations currently create:
+  - `scans`
+  - `app_settings`
 
 Guidance for future sessions:
 

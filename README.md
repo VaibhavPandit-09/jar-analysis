@@ -11,6 +11,7 @@ JARScan is a personal web-based Java artifact analyzer for `.jar`, `.war`, `.ear
 - Nested/fat JAR detection for common layouts such as `BOOT-INF/lib/`
 - Live analysis progress and Maven log streaming
 - Local vulnerability scanning through OWASP Dependency-Check CLI
+- Optional NVD API key settings with masked local storage
 - JSON, Markdown, and HTML report export
 - Persistent scan history with reopen, notes/tags, and delete actions
 - Light, dark, and system theme support
@@ -83,6 +84,17 @@ Completed scans are stored in a local SQLite database so history survives contai
 - The frontend exposes this history at `/scan-history`
 - Reopened scans render in the same results dashboard used for fresh job results
 
+## NVD API Key And Vulnerability DB Settings
+
+JARScan exposes a local settings page at `/settings` for Dependency-Check configuration.
+
+- NVD API key setup is optional
+- The key can make Dependency-Check updates much faster
+- The raw key is stored locally in a restricted file under `/app/data/secrets/nvd-api-key`
+- Only a masked suffix such as `****abcd` is returned to the UI
+- The raw key is not included in reports, API responses, or SSE logs
+- Dependency-Check DB status and manual sync controls are available from the settings page
+
 ## Local Development
 
 ### Backend
@@ -115,6 +127,8 @@ Environment variables supported by the backend:
 - `JARSCAN_MAX_NESTED_JAR_DEPTH`
 - `JARSCAN_MAX_EXTRACTED_ARCHIVE_SIZE_BYTES`
 
+Most users should configure the NVD API key through the UI rather than an environment variable.
+
 ## Export Formats
 
 - JSON: `/api/jobs/{jobId}/export?format=json`
@@ -135,7 +149,7 @@ docker compose down -v
 
 ### First vulnerability DB sync is slow
 
-Dependency-Check may need to initialize or refresh its local database on first use. The first scan or manual sync can take several minutes depending on network conditions.
+Dependency-Check may need to initialize or refresh its local database on first use. The first scan or manual sync can take several minutes depending on network conditions, especially without an NVD API key.
 
 ### Maven resolution failed
 
@@ -155,7 +169,7 @@ POM resolution plus Dependency-Check can be expensive on very large graphs. The 
 
 ### Frontend route refresh returns 404
 
-The backend includes SPA forwarding for `/scan-history`, `/jobs/:jobId`, `/jobs/:jobId/results`, and `/scans/:scanId/results`. Rebuild the image if you are running an older container.
+The backend includes SPA forwarding for `/scan-history`, `/settings`, `/jobs/:jobId`, `/jobs/:jobId/results`, and `/scans/:scanId/results`. Rebuild the image if you are running an older container.
 
 ### Java 25 image concerns
 
@@ -164,6 +178,7 @@ The project is built and run on Eclipse Temurin Java 25 through the official Mav
 ## Known Limitations
 
 - Dependency-Check findings depend on its local database state and may take time on a cold start.
+- NVD API key storage is local-first and masked in the UI, but the host machine and persisted Docker volume should still be treated as sensitive when a key is configured.
 - Private Maven repositories are not automatically authenticated.
 - Running jobs and SSE event streams are still in-memory while the job is active, even though completed scan results now persist in SQLite history.
 - Dependency tables on individual artifact cards focus on embedded nested archives rather than reconstructing a full Maven graph per artifact.

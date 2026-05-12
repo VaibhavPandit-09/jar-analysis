@@ -60,8 +60,11 @@ Visible major areas:
 Current route surface:
 
 - `/`
+- `/scan-history`
+- `/settings`
 - `/jobs/:jobId`
 - `/jobs/:jobId/results`
+- `/scans/:scanId/results`
 
 The app shell provides:
 
@@ -96,6 +99,7 @@ Persistent local data:
 - SQLite scan history database under `/app/data/jarscan.db` by default
 - Maven repository cache under `/root/.m2`
 - Dependency-Check data under `/app/data/dependency-check`
+- optional NVD API key secret file under `/app/data/secrets/nvd-api-key`
 
 Transient runtime state:
 
@@ -114,6 +118,7 @@ Currently persisted:
 - job status for terminal states
 - full result JSON
 - editable notes and tags
+- app settings metadata and vulnerability DB sync state
 
 Planned future SQLite data:
 
@@ -168,6 +173,7 @@ Current vulnerability flow:
 5. JSON output is parsed
 6. findings are attached back onto analyzed artifacts
 7. DB sync status and update events are exposed through `VulnerabilityDbController`
+8. if configured, the stored NVD API key is injected into Dependency-Check command execution without being exposed in logs or API payloads
 
 Fallback behavior exists through:
 
@@ -179,9 +185,12 @@ Backend pieces visible from code:
 
 - `JobController`: job creation, status, result, SSE stream, cancellation, exports
 - `ScanHistoryController`: scan history list, detail, delete, metadata patch
+- `SettingsController`: masked NVD key settings lifecycle
 - `VulnerabilityDbController`: DB status, manual sync trigger, DB event stream
 - `AnalysisJobService`: active job lifecycle and orchestration
 - `ScanHistoryService`: persistence bridge between terminal jobs and SQLite history
+- `NvdSettingsService`: local secret file management and masked status
+- `VulnerabilityDbStatusStore`: persisted DB sync metadata
 - `JarAnalyzerService`: archive inspection and nested archive analysis
 - `MavenResolutionService`: Maven CLI orchestration
 - `ReportExportService`: JSON, Markdown, and HTML export generation

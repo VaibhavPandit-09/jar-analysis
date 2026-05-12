@@ -45,6 +45,14 @@ SQLite fits the product shape well:
 
 JARScan should remain usable without any external credential. An NVD API key should improve refresh performance and reliability, but it should not become a hard requirement for running the tool.
 
+## Why The NVD API Key Is Stored In A Local Restricted File
+
+For this local-first personal tool, the simplest safe approach is to store the raw NVD API key in a restricted local file under the persisted data directory rather than returning it through APIs or embedding it in exported reports. SQLite still stores related metadata and sync state, but the raw secret stays outside ordinary result and settings payloads.
+
+## Why The UI Only Shows A Masked Key
+
+After a key is saved, the frontend should only receive a masked suffix such as `****abcd`. This reduces accidental exposure in screenshots, logs, and browser devtools while still confirming which local key is active.
+
 ## Why Scan Results Should Be Stored As Metadata Plus Full JSON
 
 Summary columns enable:

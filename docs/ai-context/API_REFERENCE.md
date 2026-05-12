@@ -74,6 +74,8 @@ Exports currently operate against the existing job/result model. The Session 3 h
   - upload page
 - `/scan-history`
   - persisted scan history list and actions
+- `/settings`
+  - NVD API key settings, Dependency-Check DB status, and manual sync UI
 - `/jobs/{jobId}`
   - live progress page
 - `/jobs/{jobId}/results`
@@ -81,13 +83,32 @@ Exports currently operate against the existing job/result model. The Session 3 h
 - `/scans/{scanId}/results`
   - reopened persisted results page
 
+### NVD Settings APIs
+
+- `GET /api/settings/nvd`
+  - returns configured state, masked key suffix, storage mode, and updated timestamp
+
+- `POST /api/settings/nvd`
+  - saves a new NVD API key
+  - request body:
+    - `apiKey`
+  - does not return the raw key after save
+
+- `POST /api/settings/nvd/test`
+  - performs local, best-effort validation of the stored key format
+
+- `DELETE /api/settings/nvd`
+  - removes the locally stored NVD API key
+
 ### Vulnerability DB APIs
 
 - `GET /api/vulnerability-db/status`
   - current Dependency-Check DB status
+  - includes CLI version, data directory, API key configured flag, last sync metadata, and last error if present
 
 - `POST /api/vulnerability-db/sync`
   - starts local DB sync
+  - returns HTTP 409 if a sync is already running
 
 ### Vulnerability DB SSE
 
@@ -101,6 +122,8 @@ The following response DTOs are visible or directly implied by controller/servic
 - `AnalysisJobResponse`
 - `AnalysisJobStatusResponse`
 - `AnalysisResult`
+- `NvdSettingsStatusResponse`
+- `NvdSettingsTestResponse`
 - `ProgressEvent`
 - `VulnerabilityDbStatus`
 - `StoredScanSummaryResponse`
@@ -120,18 +143,15 @@ Possible outputs:
 - vulnerability deltas
 - policy delta summaries
 
-## Planned v2 Settings / NVD Endpoints
+## Planned v2 Settings Endpoints
 
-Expected direction for Session 4:
+Expected direction for later sessions:
 
 - `GET /api/settings`
 - `PUT /api/settings`
-- `GET /api/settings/nvd`
-- `PUT /api/settings/nvd`
 
 Potential stored values:
 
-- NVD API key
 - default Maven dependency scope
 - scan defaults
 

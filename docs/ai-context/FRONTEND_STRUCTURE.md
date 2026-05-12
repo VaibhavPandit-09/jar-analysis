@@ -6,6 +6,7 @@ Current visible routes:
 
 - `/`
 - `/scan-history`
+- `/settings`
 - `/jobs/:jobId`
 - `/jobs/:jobId/results`
 - `/scans/:scanId/results`
@@ -46,6 +47,15 @@ These routes are defined in `frontend/src/App.tsx`.
 - supports simple notes and tags editing
 - exposes export links for persisted scans through their stored `jobId`
 
+### `SettingsPage`
+
+- loads masked NVD API key status from `/api/settings/nvd`
+- saves and removes the local NVD API key
+- triggers best-effort NVD key validation
+- shows Dependency-Check DB status details
+- starts manual DB sync
+- subscribes to `/api/vulnerability-db/events` for live sync logs
+
 ## Shared Components
 
 Visible app-level shared components:
@@ -59,7 +69,7 @@ Visible app-level shared components:
 
 - page chrome
 - app header
-- top-level navigation for upload and scan history
+- top-level navigation for upload, scan history, and settings
 - DB status indicator
 - DB sync button
 - routed content outlet
@@ -113,6 +123,10 @@ Visible request helpers include:
 - `deleteStoredScan`
 - `updateStoredScan`
 - `cancelJob`
+- `fetchNvdSettings`
+- `saveNvdSettings`
+- `testNvdSettings`
+- `deleteNvdSettings`
 - `fetchVulnerabilityDbStatus`
 - `syncVulnerabilityDb`
 
@@ -131,6 +145,8 @@ Visible behavior:
 - appends incoming events into local component state
 
 There is currently no reusable SSE hook or centralized event-state store.
+
+The new settings page also uses page-local SSE for vulnerability DB sync events.
 
 ## Results Dashboard Structure
 
@@ -158,7 +174,6 @@ The reusable results dashboard now sits underneath both:
 
 Future sessions are expected to add pages or major UI surfaces for:
 
-- settings / NVD API key configuration
 - Dependency-Check DB status and manual sync management
 - scan comparison
 - dependency tree visualization

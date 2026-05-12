@@ -140,8 +140,29 @@ export interface ProgressEvent {
 
 export interface VulnerabilityDbStatus {
   available: boolean;
+  cliVersion: string | null;
+  dataDirectory: string | null;
+  apiKeyConfigured: boolean;
   lastUpdated: string | null;
   isUpdating: boolean;
+  lastSyncStartedAt: string | null;
+  lastSyncCompletedAt: string | null;
+  lastSyncDurationMs: number | null;
+  lastSyncStatus: string | null;
+  lastSyncError: string | null;
+  message: string;
+}
+
+export interface NvdSettingsStatus {
+  configured: boolean;
+  maskedKey: string | null;
+  storageMode: string;
+  updatedAt: string | null;
+}
+
+export interface NvdSettingsTestResponse {
+  configured: boolean;
+  valid: boolean;
   message: string;
 }
 

@@ -6,7 +6,11 @@ Dependency-Check results depend on the freshness and health of the local vulnera
 
 ## NVD API Key Performance Differences
 
-JARScan remains usable without an NVD API key, but users should expect slower or more rate-limited database update behavior compared with a configured key once that setting is introduced.
+JARScan remains usable without an NVD API key, but users should expect slower or more rate-limited database update behavior compared with a configured key.
+
+## Local Secret Storage Depends On Host Security
+
+The NVD API key is masked in the UI and never returned after save, but it is still stored locally on disk for this Docker-first workflow. Anyone with access to the host filesystem or persisted Docker volume may still be able to access the configured secret file.
 
 ## Private Maven Repository Authentication
 
@@ -15,6 +19,10 @@ Uploaded `pom.xml` resolution depends on the Maven CLI environment inside the co
 ## Running Jobs And Live SSE State Are Still In-Memory
 
 Completed scan history is now persisted in SQLite under `/app/data/jarscan.db`, but active jobs, live progress state, and SSE replay buffers are still runtime-only. A container restart during an in-flight job will still lose that active execution state.
+
+## NVD Key Validation Is Best-Effort
+
+The settings page performs best-effort local validation of the stored NVD API key format. It does not guarantee that the key is currently accepted by NVD or that upstream services are reachable.
 
 ## Unused Dependency Confidence Caveats
 

@@ -44,6 +44,13 @@ Current package layout under `backend/src/main/java/com/jarscan`:
 - trigger manual database sync
 - stream DB sync SSE events
 
+### `SettingsController`
+
+- expose masked NVD API key settings status
+- save a new local NVD API key
+- run best-effort key validation
+- remove the locally stored NVD API key
+
 ### `SpaForwardController`
 
 - forwards SPA routes for deep-link refresh support
@@ -110,6 +117,23 @@ Current package layout under `backend/src/main/java/com/jarscan`:
 
 - SSE fanout for database sync events
 
+### `NvdSettingsService`
+
+- validates NVD API key format
+- stores the raw key through a local secret file service
+- exposes masked status only
+- never returns the raw key to controllers
+
+### `NvdApiKeyStore`
+
+- reads and writes the raw NVD API key at `/app/data/secrets/nvd-api-key`
+- uses best-effort restricted file permissions
+
+### `VulnerabilityDbStatusStore`
+
+- stores last sync metadata in SQLite app settings
+- tracks last sync start, completion, duration, status, and last error
+
 ## Persistence Layer
 
 ### `ScanHistoryRepository`
@@ -125,6 +149,13 @@ Current package layout under `backend/src/main/java/com/jarscan`:
 - `PersistedScanUpsert`
 - `ScanSearchCriteria`
 - `StoredScanMetadataUpdate`
+- `AppSettingRecord`
+
+### Additional Persistence Repositories
+
+- `AppSettingsRepository`
+  - stores general application setting metadata in SQLite
+  - currently used for NVD key metadata and vulnerability DB sync state
 
 These exist to keep controller DTOs and database row mapping separated from job orchestration models.
 
@@ -144,6 +175,8 @@ Visible DTO and model roles:
 - `StoredScanResponse`: stored scan detail payload
 - `UpdateStoredScanRequest`: notes and tags patch payload
 - `VulnerabilityDbStatus`: Dependency-Check DB state
+- `NvdSettingsStatusResponse`: masked NVD configuration status
+- `NvdSettingsTestResponse`: best-effort validation response
 - `MavenCoordinates`: extracted group, artifact, version
 - `ManifestInfo`: manifest fields and raw attributes
 - `JavaVersionInfo`: bytecode version summary
@@ -169,6 +202,7 @@ Important backend configuration concerns already represented:
 - Maven timeout
 - default Maven dependency scope
 - multipart upload size
+- local secret file path derived from `dataDir`
 
 ## Job System
 
@@ -223,6 +257,8 @@ Current behavior:
 - JSON output is parsed back into `VulnerabilityFinding` objects
 - findings are attached to artifacts and nested artifacts
 - DB sync is local and optional
+- a configured NVD API key is appended to the Dependency-Check command through a dedicated command builder
+- masked command text is safe to stream, but the raw key is never published
 
 ## Current Persistence Limitation
 
@@ -232,7 +268,7 @@ Current gaps:
 
 - active jobs are still in-memory only
 - SSE event buffers are still in-memory only
-- app settings, suppressions, and policies are not persisted yet
+- suppressions and policies are not persisted yet
 
 ## Planned v2 Persistence Direction
 

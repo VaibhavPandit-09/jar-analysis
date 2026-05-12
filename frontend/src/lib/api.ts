@@ -1,6 +1,8 @@
 import type {
   AnalysisJobStatus,
   AnalysisResult,
+  NvdSettingsStatus,
+  NvdSettingsTestResponse,
   StoredScan,
   StoredScanQuery,
   StoredScanSummary,
@@ -56,6 +58,36 @@ export async function syncVulnerabilityDb() {
   return parseJson<VulnerabilityDbStatus>(
     await fetch("/api/vulnerability-db/sync", { method: "POST" }),
   );
+}
+
+export async function fetchNvdSettings() {
+  return parseJson<NvdSettingsStatus>(await fetch("/api/settings/nvd"));
+}
+
+export async function saveNvdSettings(apiKey: string) {
+  return parseJson<NvdSettingsStatus>(
+    await fetch("/api/settings/nvd", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ apiKey }),
+    }),
+  );
+}
+
+export async function testNvdSettings() {
+  return parseJson<NvdSettingsTestResponse>(
+    await fetch("/api/settings/nvd/test", {
+      method: "POST",
+    }),
+  );
+}
+
+export async function deleteNvdSettings() {
+  const response = await fetch("/api/settings/nvd", { method: "DELETE" });
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(body || `Request failed with ${response.status}`);
+  }
 }
 
 export async function fetchScans(query: StoredScanQuery = {}) {
