@@ -166,6 +166,24 @@ export function ResultsPage() {
         ))}
       </section>
 
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+        {[
+          ["Critical", result.summary.critical, "critical"],
+          ["High", result.summary.high, "high"],
+          ["Medium", result.summary.medium, "medium"],
+          ["Low", result.summary.low, "low"],
+          ["Info", result.summary.info, "info"],
+          ["Unknown", result.summary.unknown, "neutral"],
+        ].map(([label, value, variant]) => (
+          <Card key={String(label)}>
+            <CardContent className="p-5">
+              <Badge variant={variant as never}>{label}</Badge>
+              <div className="mt-3 font-display text-3xl font-semibold tracking-tight">{value}</div>
+            </CardContent>
+          </Card>
+        ))}
+      </section>
+
       <Card>
         <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
@@ -196,12 +214,26 @@ export function ResultsPage() {
               ))}
             </select>
             <a
-              href={`/api/jobs/${jobId}/result`}
+              href={`/api/jobs/${jobId}/export?format=json`}
               download={`jarscan-${jobId}.json`}
               className={cn(buttonVariants({ variant: "outline" }))}
             >
               <Download className="mr-2 h-4 w-4" />
               Export JSON
+            </a>
+            <a
+              href={`/api/jobs/${jobId}/export?format=markdown`}
+              download={`jarscan-${jobId}.md`}
+              className={cn(buttonVariants({ variant: "outline" }))}
+            >
+              Export Markdown
+            </a>
+            <a
+              href={`/api/jobs/${jobId}/export?format=html`}
+              download={`jarscan-${jobId}.html`}
+              className={cn(buttonVariants({ variant: "outline" }))}
+            >
+              Export HTML
             </a>
           </div>
         </CardHeader>
@@ -321,6 +353,22 @@ export function ResultsPage() {
           </Accordion>
         </CardContent>
       </Card>
+
+      {result.dependencyTreeText ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Dependency tree</CardTitle>
+            <CardDescription>
+              Raw Maven dependency tree output captured during the uploaded POM resolution workflow.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <pre className="overflow-x-auto rounded-3xl border border-border/70 bg-slate-950 p-4 text-xs text-slate-200">
+              {result.dependencyTreeText}
+            </pre>
+          </CardContent>
+        </Card>
+      ) : null}
     </motion.div>
   );
 }
