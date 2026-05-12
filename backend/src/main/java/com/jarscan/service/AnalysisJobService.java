@@ -40,17 +40,20 @@ public class AnalysisJobService {
     private final ProgressEventService progressEventService;
     private final JarAnalyzerService jarAnalyzerService;
     private final MavenResolutionService mavenResolutionService;
+    private final VulnerabilityScannerService vulnerabilityScannerService;
 
     public AnalysisJobService(
             ExecutorService analysisExecutor,
             ProgressEventService progressEventService,
             JarAnalyzerService jarAnalyzerService,
-            MavenResolutionService mavenResolutionService
+            MavenResolutionService mavenResolutionService,
+            VulnerabilityScannerService vulnerabilityScannerService
     ) {
         this.analysisExecutor = analysisExecutor;
         this.progressEventService = progressEventService;
         this.jarAnalyzerService = jarAnalyzerService;
         this.mavenResolutionService = mavenResolutionService;
+        this.vulnerabilityScannerService = vulnerabilityScannerService;
     }
 
     public AnalysisJobResponse createJob(List<MultipartFile> files) {
@@ -146,6 +149,9 @@ public class AnalysisJobService {
                 checkCancelled(job);
                 artifacts.add(jarAnalyzerService.analyze(path, job.workspaceDir(), job.warnings()));
             }
+
+            artifacts = new ArrayList<>(vulnerabilityScannerService.scanArtifacts(job, artifacts, event ->
+                    progressEventService.publish(job, event)));
 
             AnalysisResult result = new AnalysisResult(
                     job.id(),
