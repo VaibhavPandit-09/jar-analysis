@@ -7,6 +7,7 @@ This file documents the planned JARScan v2 feature set. These items are roadmap 
 - local SQLite-backed scan history
 - reopen prior scan results without rescanning
 - metadata-driven history list
+- implemented across Sessions 2 and 3
 
 ## NVD API Key Support
 
@@ -104,6 +105,8 @@ This file documents the planned JARScan v2 feature set. These items are roadmap 
 ## UI Upgrades
 
 - scan history page
+- old scan reopening through the same results dashboard
+- delete confirmation and lightweight notes/tags editing
 - comparison views
 - richer results navigation
 - settings surfaces

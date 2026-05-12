@@ -5,8 +5,10 @@
 Current visible routes:
 
 - `/`
+- `/scan-history`
 - `/jobs/:jobId`
 - `/jobs/:jobId/results`
+- `/scans/:scanId/results`
 
 These routes are defined in `frontend/src/App.tsx`.
 
@@ -27,12 +29,22 @@ These routes are defined in `frontend/src/App.tsx`.
 
 ### `ResultsPage`
 
-- fetches `/api/jobs/{jobId}/result`
+- fetches either `/api/jobs/{jobId}/result` or `/api/scans/{scanId}`
 - renders summary cards
 - renders severity rollups
 - shows artifact accordions with tabs
 - supports export links
 - shows dependency-tree text when present
+- reuses the same dashboard UI for fresh and reopened persisted scans
+
+### `ScanHistoryPage`
+
+- loads persisted scan summaries from `/api/scans`
+- supports local search, filtering, and sorting
+- links to reopened persisted results
+- supports delete flow with confirmation
+- supports simple notes and tags editing
+- exposes export links for persisted scans through their stored `jobId`
 
 ## Shared Components
 
@@ -47,6 +59,7 @@ Visible app-level shared components:
 
 - page chrome
 - app header
+- top-level navigation for upload and scan history
 - DB status indicator
 - DB sync button
 - routed content outlet
@@ -95,6 +108,10 @@ Visible request helpers include:
 - `createAnalysisJob`
 - `fetchJobStatus`
 - `fetchJobResult`
+- `fetchScans`
+- `fetchStoredScan`
+- `deleteStoredScan`
+- `updateStoredScan`
 - `cancelJob`
 - `fetchVulnerabilityDbStatus`
 - `syncVulnerabilityDb`
@@ -132,12 +149,15 @@ Current results page structure:
 - optional dependency-tree block
 - export actions for JSON, Markdown, and HTML
 
+The reusable results dashboard now sits underneath both:
+
+- fresh scan result flow
+- reopened persisted scan history flow
+
 ## Planned v2 UI Pages
 
 Future sessions are expected to add pages or major UI surfaces for:
 
-- scan history
-- reopened scan details from persisted storage
 - settings / NVD API key configuration
 - Dependency-Check DB status and manual sync management
 - scan comparison

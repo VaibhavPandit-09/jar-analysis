@@ -1,6 +1,10 @@
 import type {
   AnalysisJobStatus,
   AnalysisResult,
+  StoredScan,
+  StoredScanQuery,
+  StoredScanSummary,
+  UpdateStoredScanPayload,
   VulnerabilityDbStatus,
 } from "./types";
 
@@ -32,6 +36,10 @@ export async function fetchJobResult(jobId: string) {
   return parseJson<AnalysisResult>(await fetch(`/api/jobs/${jobId}/result`));
 }
 
+export function buildJobExportUrl(jobId: string, format: "json" | "markdown" | "html") {
+  return `/api/jobs/${jobId}/export?format=${format}`;
+}
+
 export async function cancelJob(jobId: string) {
   return parseJson<AnalysisJobStatus>(
     await fetch(`/api/jobs/${jobId}/cancel`, { method: "POST" }),
@@ -47,5 +55,39 @@ export async function fetchVulnerabilityDbStatus() {
 export async function syncVulnerabilityDb() {
   return parseJson<VulnerabilityDbStatus>(
     await fetch("/api/vulnerability-db/sync", { method: "POST" }),
+  );
+}
+
+export async function fetchScans(query: StoredScanQuery = {}) {
+  const params = new URLSearchParams();
+  Object.entries(query).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== "") {
+      params.set(key, String(value));
+    }
+  });
+
+  const suffix = params.toString() ? `?${params}` : "";
+  return parseJson<StoredScanSummary[]>(await fetch(`/api/scans${suffix}`));
+}
+
+export async function fetchStoredScan(scanId: string) {
+  return parseJson<StoredScan>(await fetch(`/api/scans/${scanId}`));
+}
+
+export async function deleteStoredScan(scanId: string) {
+  const response = await fetch(`/api/scans/${scanId}`, { method: "DELETE" });
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(body || `Request failed with ${response.status}`);
+  }
+}
+
+export async function updateStoredScan(scanId: string, payload: UpdateStoredScanPayload) {
+  return parseJson<StoredScanSummary>(
+    await fetch(`/api/scans/${scanId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }),
   );
 }

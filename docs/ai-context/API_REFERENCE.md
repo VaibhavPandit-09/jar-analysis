@@ -39,7 +39,7 @@ This file documents currently visible backend endpoints and planned v2 expansion
 - `GET /api/jobs/{jobId}/export?format=markdown`
 - `GET /api/jobs/{jobId}/export?format=html`
 
-Exports continue to operate against the existing job/result model. Future sessions may add scan-id-based exports if needed.
+Exports currently operate against the existing job/result model. The Session 3 history UI reuses these endpoints through each persisted scan's stored `jobId`, because `GET /api/jobs/{jobId}/result` already falls back to persisted SQLite results when needed.
 
 ### Scan History APIs
 
@@ -57,6 +57,7 @@ Exports continue to operate against the existing job/result model. Future sessio
 
 - `GET /api/scans/{scanId}`
   - returns the stored scan summary plus full persisted result
+  - used by the reopened scan results route in the frontend
 
 - `DELETE /api/scans/{scanId}`
   - deletes a stored scan record
@@ -66,6 +67,19 @@ Exports continue to operate against the existing job/result model. Future sessio
   - current editable fields:
     - `notes`
     - `tags`
+
+## Current Frontend Route Surface That Depends On These APIs
+
+- `/`
+  - upload page
+- `/scan-history`
+  - persisted scan history list and actions
+- `/jobs/{jobId}`
+  - live progress page
+- `/jobs/{jobId}/results`
+  - fresh scan results page
+- `/scans/{scanId}/results`
+  - reopened persisted results page
 
 ### Vulnerability DB APIs
 

@@ -144,3 +144,53 @@ export interface VulnerabilityDbStatus {
   isUpdating: boolean;
   message: string;
 }
+
+export interface StoredScanSummary {
+  scanId: string;
+  jobId: string;
+  inputType: InputType;
+  inputName: string | null;
+  inputHash: string | null;
+  status: JobStatus;
+  startedAt: string | null;
+  completedAt: string | null;
+  durationMs: number | null;
+  totalArtifacts: number;
+  totalDependencies: number;
+  totalVulnerabilities: number;
+  criticalCount: number;
+  highCount: number;
+  mediumCount: number;
+  lowCount: number;
+  infoCount: number;
+  unknownCount: number;
+  highestCvss: number | null;
+  requiredJavaVersion: string | null;
+  highestSeverity: Severity;
+  createdAppVersion: string | null;
+  notes: string | null;
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StoredScan {
+  summary: StoredScanSummary;
+  result: AnalysisResult | null;
+}
+
+export interface StoredScanQuery {
+  q?: string;
+  inputType?: InputType;
+  status?: JobStatus;
+  severity?: Severity;
+  sort?: string;
+  direction?: "asc" | "desc";
+  limit?: number;
+  offset?: number;
+}
+
+export interface UpdateStoredScanPayload {
+  notes?: string | null;
+  tags?: string[];
+}

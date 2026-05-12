@@ -12,6 +12,7 @@ JARScan is a personal web-based Java artifact analyzer for `.jar`, `.war`, `.ear
 - Live analysis progress and Maven log streaming
 - Local vulnerability scanning through OWASP Dependency-Check CLI
 - JSON, Markdown, and HTML report export
+- Persistent scan history with reopen, notes/tags, and delete actions
 - Light, dark, and system theme support
 
 ## AI Maintainer Context
@@ -79,6 +80,8 @@ Completed scans are stored in a local SQLite database so history survives contai
 - Override with `JARSCAN_DB_PATH`
 - The database lives under the `jarscan-data` volume by default
 - Deleting Docker volumes with `docker compose down -v` also deletes stored scan history
+- The frontend exposes this history at `/scan-history`
+- Reopened scans render in the same results dashboard used for fresh job results
 
 ## Local Development
 
@@ -118,6 +121,8 @@ Environment variables supported by the backend:
 - Markdown: `/api/jobs/{jobId}/export?format=markdown`
 - HTML: `/api/jobs/{jobId}/export?format=html`
 
+From the scan history page, these export formats are also available for persisted scans through the stored job identity.
+
 ## Resetting Data
 
 To remove persisted Maven and vulnerability caches:
@@ -150,7 +155,7 @@ POM resolution plus Dependency-Check can be expensive on very large graphs. The 
 
 ### Frontend route refresh returns 404
 
-The backend includes SPA forwarding for `/jobs/:jobId` and `/jobs/:jobId/results`. Rebuild the image if you are running an older container.
+The backend includes SPA forwarding for `/scan-history`, `/jobs/:jobId`, `/jobs/:jobId/results`, and `/scans/:scanId/results`. Rebuild the image if you are running an older container.
 
 ### Java 25 image concerns
 

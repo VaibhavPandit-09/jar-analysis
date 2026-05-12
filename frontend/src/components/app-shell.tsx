@@ -87,6 +87,28 @@ export function AppShell() {
                   </p>
                 </div>
               </NavLink>
+              <nav className="flex flex-wrap gap-2 pt-2">
+                {[
+                  { to: "/", label: "Upload", end: true },
+                  { to: "/scan-history", label: "Scan History" },
+                ].map((item) => (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    end={item.end}
+                    className={({ isActive }) =>
+                      [
+                        "rounded-full border px-4 py-2 text-sm font-medium transition",
+                        isActive
+                          ? "border-primary/30 bg-primary/10 text-primary"
+                          : "border-border bg-background/60 text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                      ].join(" ")
+                    }
+                  >
+                    {item.label}
+                  </NavLink>
+                ))}
+              </nav>
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
