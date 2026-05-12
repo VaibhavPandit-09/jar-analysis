@@ -8,6 +8,7 @@ import com.jarscan.dto.ArtifactAnalysis;
 import com.jarscan.dto.ProgressEvent;
 import com.jarscan.job.AnalysisJob;
 import com.jarscan.job.JobCancelledException;
+import com.jarscan.maven.MavenResolutionResult;
 import com.jarscan.model.InputType;
 import com.jarscan.model.JobStatus;
 import com.jarscan.model.ProgressEventType;
@@ -38,15 +39,18 @@ public class AnalysisJobService {
     private final ExecutorService analysisExecutor;
     private final ProgressEventService progressEventService;
     private final JarAnalyzerService jarAnalyzerService;
+    private final MavenResolutionService mavenResolutionService;
 
     public AnalysisJobService(
             ExecutorService analysisExecutor,
             ProgressEventService progressEventService,
-            JarAnalyzerService jarAnalyzerService
+            JarAnalyzerService jarAnalyzerService,
+            MavenResolutionService mavenResolutionService
     ) {
         this.analysisExecutor = analysisExecutor;
         this.progressEventService = progressEventService;
         this.jarAnalyzerService = jarAnalyzerService;
+        this.mavenResolutionService = mavenResolutionService;
     }
 
     public AnalysisJobResponse createJob(List<MultipartFile> files) {
@@ -57,9 +61,6 @@ public class AnalysisJobService {
         validateFiles(files);
         String jobId = UUID.randomUUID().toString();
         InputType inputType = detectInputType(files);
-        if (inputType == InputType.POM) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "POM upload workflow is not available yet");
-        }
         Path workspaceDir = JobDirectories.createWorkspace(jobId);
         AnalysisJob job = new AnalysisJob(jobId, inputType, workspaceDir);
         jobs.put(jobId, job);
@@ -116,9 +117,19 @@ public class AnalysisJobService {
             checkCancelled(job);
 
             List<ArtifactAnalysis> artifacts = new ArrayList<>();
-            int total = storedFiles.size();
-            for (int index = 0; index < storedFiles.size(); index++) {
-                Path path = storedFiles.get(index);
+            List<Path> analysisTargets = storedFiles;
+            String dependencyTreeText = null;
+            if (job.inputType() == InputType.POM) {
+                Path pomPath = storedFiles.getFirst();
+                publish(job, ProgressEventType.PROGRESS, ProgressPhase.MAVEN_RESOLUTION, "Preparing Maven workspace", 20, pomPath.getFileName().toString(), 0, 1);
+                MavenResolutionResult resolutionResult = mavenResolutionService.resolveDependencies(job, pomPath, "runtime");
+                analysisTargets = resolutionResult.resolvedArtifacts();
+                dependencyTreeText = resolutionResult.dependencyTreeText();
+            }
+
+            int total = analysisTargets.size();
+            for (int index = 0; index < analysisTargets.size(); index++) {
+                Path path = analysisTargets.get(index);
                 publish(job, ProgressEventType.PROGRESS, ProgressPhase.ANALYZING,
                         "Analyzing " + path.getFileName(),
                         Math.min(95, 20 + ((index * 70) / Math.max(1, total))),
@@ -150,7 +161,7 @@ public class AnalysisJobService {
                             "Unknown"
                     ),
                     artifacts,
-                    null,
+                    dependencyTreeText,
                     List.copyOf(job.warnings()),
                     List.copyOf(job.errors())
             );
