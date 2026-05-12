@@ -54,8 +54,12 @@ public class AnalysisJobService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "At least one file is required");
         }
 
+        validateFiles(files);
         String jobId = UUID.randomUUID().toString();
         InputType inputType = detectInputType(files);
+        if (inputType == InputType.POM) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "POM upload workflow is not available yet");
+        }
         Path workspaceDir = JobDirectories.createWorkspace(jobId);
         AnalysisJob job = new AnalysisJob(jobId, inputType, workspaceDir);
         jobs.put(jobId, job);
@@ -189,6 +193,23 @@ public class AnalysisJobService {
                 .filter(name -> name != null)
                 .anyMatch(name -> name.equalsIgnoreCase("pom.xml"));
         return pomPresent ? InputType.POM : InputType.ARCHIVE_UPLOAD;
+    }
+
+    private void validateFiles(List<MultipartFile> files) {
+        for (MultipartFile file : files) {
+            String fileName = file.getOriginalFilename();
+            if (fileName == null || fileName.isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Uploaded file is missing a filename");
+            }
+            String lowerName = fileName.toLowerCase();
+            boolean supported = lowerName.endsWith(".jar")
+                    || lowerName.endsWith(".war")
+                    || lowerName.endsWith(".ear")
+                    || lowerName.equals("pom.xml");
+            if (!supported) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported file type: " + fileName);
+            }
+        }
     }
 
     private AnalysisJob getJob(String jobId) {
