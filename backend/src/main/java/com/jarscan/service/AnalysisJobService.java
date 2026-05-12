@@ -126,7 +126,7 @@ public class AnalysisJobService {
                         index,
                         total);
                 checkCancelled(job);
-                artifacts.add(jarAnalyzerService.analyze(path));
+                artifacts.add(jarAnalyzerService.analyze(path, job.workspaceDir(), job.warnings()));
             }
 
             AnalysisResult result = new AnalysisResult(
