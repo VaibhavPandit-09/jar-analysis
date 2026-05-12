@@ -1,0 +1,20 @@
+services:
+  jarscan:
+    build:
+      context: .
+    container_name: jarscan
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      JARSCAN_DATA_DIR: /app/data
+      JARSCAN_MAX_UPLOAD_SIZE: 500MB
+      JARSCAN_MAVEN_TIMEOUT_SECONDS: 600
+    volumes:
+      - jarscan-data:/app/data
+      - jarscan-m2:/root/.m2
+    restart: unless-stopped
+
+volumes:
+  jarscan-data:
+  jarscan-m2:
