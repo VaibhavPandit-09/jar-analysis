@@ -1,0 +1,26 @@
+spring:
+  application:
+    name: jarscan
+  servlet:
+    multipart:
+      max-file-size: ${JARSCAN_MAX_UPLOAD_SIZE:500MB}
+      max-request-size: ${JARSCAN_MAX_UPLOAD_SIZE:500MB}
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+server:
+  shutdown: graceful
+
+jarscan:
+  data-dir: ${JARSCAN_DATA_DIR:${user.home}/.jarscan}
+  max-nested-jar-depth: ${JARSCAN_MAX_NESTED_JAR_DEPTH:4}
+  max-extracted-archive-size-bytes: ${JARSCAN_MAX_EXTRACTED_ARCHIVE_SIZE_BYTES:268435456}
+  maven-timeout-seconds: ${JARSCAN_MAVEN_TIMEOUT_SECONDS:600}
+  maven-dependency-scope: ${JARSCAN_MAVEN_DEPENDENCY_SCOPE:runtime}
