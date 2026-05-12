@@ -45,6 +45,8 @@ Important services currently visible:
 - `ReportExportService`
 - `VulnerabilityDbEventService`
 - `VulnerabilityScannerService`
+- `ProjectArchiveService`
+- `ProjectStructureDetector`
 
 ## Frontend Structure
 
@@ -65,6 +67,11 @@ Current route surface:
 - `/jobs/:jobId`
 - `/jobs/:jobId/results`
 - `/scans/:scanId/results`
+
+Current results UI now also includes:
+
+- project structure summary cards for project ZIP scans
+- a per-artifact Fat JAR Inspector tab for fat JAR, WAR, and EAR layouts
 
 The app shell provides:
 
@@ -161,6 +168,19 @@ Current Maven flow for `pom.xml` uploads:
 Important design constraint:
 
 - Maven CLI is the resolver of record; the app does not manually implement transitive dependency resolution
+
+## Project ZIP Flow
+
+Current project ZIP flow:
+
+1. upload is written into a temporary per-job workspace
+2. backend detects `InputType.PROJECT_ZIP`
+3. ZIP extraction runs with zip-slip protection plus file-count and extracted-size limits
+4. project structure detection scans for root POM candidates, packaged archives, compiled class directories, Spring metadata, and ServiceLoader metadata
+5. if a root POM is found, Maven CLI resolves dependencies from that location
+6. packaged JAR/WAR/EAR files and dependency archive directories are analyzed through the existing archive analyzer
+
+This still stays dependency-focused and does not execute or vulnerability-scan source code as application code.
 
 ## Dependency-Check Integration Flow
 

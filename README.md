@@ -1,14 +1,16 @@
 # JARScan
 
-JARScan is a personal web-based Java artifact analyzer for `.jar`, `.war`, `.ear`, and `pom.xml` inputs. It resolves Maven dependencies inside the container, inspects archive metadata without executing uploaded code, detects nested libraries, streams progress over Server-Sent Events, and folds local vulnerability findings into a modern React dashboard.
+JARScan is a personal web-based Java artifact analyzer for `.jar`, `.war`, `.ear`, `.zip`, and `pom.xml` inputs. It resolves Maven dependencies inside the container, inspects archive metadata without executing uploaded code, detects nested libraries, safely extracts project archives, streams progress over Server-Sent Events, and folds local vulnerability findings into a modern React dashboard.
 
 ## Features
 
 - Drag-and-drop or browse uploads for one or more archives
 - Single `pom.xml` upload with Maven transitive dependency resolution
+- Single project ZIP upload with safe extraction and best-effort structure detection
 - Java bytecode version inspection from class headers
 - Manifest parsing and Maven coordinate extraction
 - Nested/fat JAR detection for common layouts such as `BOOT-INF/lib/`
+- Deeper WAR/EAR layout inspection plus Fat JAR Inspector results
 - Live analysis progress and Maven log streaming
 - Local vulnerability scanning through OWASP Dependency-Check CLI
 - Optional NVD API key settings with masked local storage
@@ -64,6 +66,14 @@ Open [http://localhost:8080](http://localhost:8080).
 3. `dependency:copy-dependencies` resolves and downloads transitive dependencies into a job-local directory.
 4. `dependency:tree` output is captured for later display/export.
 5. Each resolved artifact is analyzed like a direct archive upload.
+
+### Project ZIP upload
+
+1. The uploaded ZIP is extracted into a job-specific temporary workspace with zip-slip protection.
+2. Extraction is bounded by file-count and extracted-size limits.
+3. JARScan detects `pom.xml` files, packaged archives, compiled class directories, dependency library directories, Spring metadata, and ServiceLoader metadata.
+4. If a best-effort root POM is detected, Maven dependency resolution runs from that POM.
+5. Packaged JAR/WAR/EAR artifacts and detected dependency archives are analyzed like normal archives.
 
 ## Volumes And Persistence
 
@@ -128,6 +138,8 @@ Environment variables supported by the backend:
 - `JARSCAN_MAVEN_DEPENDENCY_SCOPE`
 - `JARSCAN_MAX_NESTED_JAR_DEPTH`
 - `JARSCAN_MAX_EXTRACTED_ARCHIVE_SIZE_BYTES`
+- `JARSCAN_PROJECT_ZIP_MAX_FILES`
+- `JARSCAN_PROJECT_ZIP_MAX_EXTRACTED_SIZE_BYTES`
 
 Most users should configure the NVD API key through the UI rather than an environment variable.
 
@@ -184,3 +196,4 @@ The project is built and run on Eclipse Temurin Java 25 through the official Mav
 - Private Maven repositories are not automatically authenticated.
 - Running jobs and SSE event streams are still in-memory while the job is active, even though completed scan results now persist in SQLite history.
 - Dependency tables on individual artifact cards focus on embedded nested archives rather than reconstructing a full Maven graph per artifact.
+- Project ZIP analysis is best-effort. If no usable root POM or compiled classes exist, Maven-backed resolution and Java-version evidence will be more limited.

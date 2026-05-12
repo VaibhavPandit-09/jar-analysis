@@ -14,6 +14,10 @@ This file documents currently visible backend endpoints and planned v2 expansion
 - `POST /api/jobs`
   - multipart upload entrypoint
   - accepts `files`
+  - supported upload modes:
+    - one or more `.jar` / `.war` / `.ear` archives
+    - one `pom.xml`
+    - one `.zip` project archive
 
 - `GET /api/jobs/{jobId}/status`
   - returns current job state
@@ -140,6 +144,8 @@ The following response DTOs are visible or directly implied by controller/servic
 - `VulnerabilityDbStatus`
 - `StoredScanSummaryResponse`
 - `StoredScanResponse`
+- `ProjectStructureSummary`
+- `PackagingInspection`
 
 ## Session 5 Comparison Status
 

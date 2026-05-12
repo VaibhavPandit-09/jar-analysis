@@ -275,7 +275,8 @@ class ScanHistoryPersistenceTests {
                 List.of(new DependencyInfo("demo.jar", new MavenCoordinates("com.example", "demo", "1.0.0"), "runtime", true, "Java 17", 2)),
                 List.of(),
                 List.of(),
-                Map.of("sourcePath", "/tmp/demo.jar")
+                Map.of("sourcePath", "/tmp/demo.jar"),
+                null
         );
 
         return new AnalysisResult(
@@ -288,7 +289,8 @@ class ScanHistoryPersistenceTests {
                 List.of(artifact),
                 null,
                 List.of(),
-                List.of()
+                List.of(),
+                null
         );
     }
 
@@ -328,7 +330,8 @@ class ScanHistoryPersistenceTests {
                 List.of(),
                 vulnerabilities,
                 List.of(),
-                Map.of()
+                Map.of(),
+                null
         );
         job.result(new AnalysisResult(
                 jobId,
@@ -348,7 +351,8 @@ class ScanHistoryPersistenceTests {
                 List.of(artifact),
                 null,
                 List.of(),
-                List.of()
+                List.of(),
+                null
         ));
         return job;
     }

@@ -8,11 +8,15 @@ import { createAnalysisJob } from "@/lib/api";
 
 function validateSelection(files: File[]) {
   const pomFiles = files.filter((file) => file.name.toLowerCase() === "pom.xml");
+  const zipFiles = files.filter((file) => file.name.toLowerCase().endsWith(".zip"));
   if (pomFiles.length > 1) {
     return "Only one pom.xml can be uploaded at a time.";
   }
-  if (pomFiles.length === 1 && files.length > 1) {
-    return "Upload either one pom.xml or one or more archives, not both together.";
+  if (zipFiles.length > 1) {
+    return "Only one project ZIP can be uploaded at a time.";
+  }
+  if ((pomFiles.length === 1 || zipFiles.length === 1) && files.length > 1) {
+    return "Upload either one pom.xml, one project ZIP, or one or more archives, not a mixed set.";
   }
   return null;
 }
@@ -82,6 +86,10 @@ export function UploadPage() {
             {
               title: "Fat JAR decomposition",
               copy: "Spring Boot and similar bundled archives are unpacked recursively so nested libraries are visible instead of hidden.",
+            },
+            {
+              title: "Project ZIP detection",
+              copy: "Project archives are extracted safely with zip-slip protection, size limits, file-count limits, and best-effort root POM detection.",
             },
           ].map((item) => (
             <div

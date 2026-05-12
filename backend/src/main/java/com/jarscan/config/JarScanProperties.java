@@ -14,6 +14,8 @@ public record JarScanProperties(
         @NotBlank String dependencyCheckCommand,
         @Min(1) int maxNestedJarDepth,
         @Min(1) long maxExtractedArchiveSizeBytes,
+        @Min(1) int projectZipMaxFiles,
+        @Min(1) long projectZipMaxExtractedSizeBytes,
         @Min(1) int mavenTimeoutSeconds,
         @NotBlank String mavenDependencyScope
 ) {

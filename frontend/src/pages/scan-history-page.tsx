@@ -73,6 +73,7 @@ function formatDuration(durationMs: number | null) {
 }
 
 function humanInputType(inputType: InputType) {
+  if (inputType === "PROJECT_ZIP") return "Project ZIP";
   return inputType === "POM" ? "POM" : "Archives";
 }
 
@@ -257,6 +258,7 @@ export function ScanHistoryPage() {
                 <option value="ALL">All input types</option>
                 <option value="ARCHIVE_UPLOAD">Archives</option>
                 <option value="POM">POM</option>
+                <option value="PROJECT_ZIP">Project ZIP</option>
               </select>
 
               <select

@@ -50,6 +50,18 @@ If an uploaded archive lacks embedded Maven metadata or related POM context, JAR
 
 Future project ZIP analysis may still be helpful, but if compiled classes are absent then bytecode-backed usage evidence becomes weaker and confidence should be reduced.
 
+## Project ZIPs Without POMs Have Reduced Resolution Fidelity
+
+If a project ZIP does not contain a usable root `pom.xml`, JARScan can still inspect packaged archives and detected library directories, but Maven-backed dependency resolution and dependency-tree output will be unavailable.
+
+## Safe Extraction Limits Can Reject Very Large Project ZIPs
+
+Project ZIP extraction is intentionally bounded by file-count and extracted-size limits. Large monorepos, generated directories, or oversized vendor bundles may be rejected unless limits are raised intentionally.
+
+## WAR/EAR And Fat JAR Inspection Is Structural
+
+Current WAR/EAR/fat JAR inspection focuses on packaged structure, embedded libraries, metadata, and bytecode versions. It does not yet perform duplicate-class detection, dependency-path explanation, or usage analysis inside those layouts.
+
 ## Suggested Exclusions Require Testing
 
 Future outputs such as unused dependency suggestions, slimming advice, or AWS bundle advice should be treated as recommendations that require validation in the user’s build and runtime environment before removal.

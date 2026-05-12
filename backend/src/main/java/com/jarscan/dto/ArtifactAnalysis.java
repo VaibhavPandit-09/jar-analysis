@@ -24,6 +24,7 @@ public record ArtifactAnalysis(
         List<DependencyInfo> dependencies,
         List<VulnerabilityFinding> vulnerabilities,
         List<ArtifactAnalysis> nestedArtifacts,
-        Map<String, Object> rawMetadata
+        Map<String, Object> rawMetadata,
+        PackagingInspection packagingInspection
 ) {
 }

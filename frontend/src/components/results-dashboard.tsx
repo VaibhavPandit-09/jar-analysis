@@ -14,7 +14,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { buildJobExportUrl } from "@/lib/api";
-import type { ArtifactAnalysis, AnalysisResult, Severity, VulnerabilityFinding } from "@/lib/types";
+import type { ArtifactAnalysis, AnalysisResult, NestedLibrarySummary, ProjectStructureSummary, Severity, VulnerabilityFinding } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const severityVariant: Record<Severity, "critical" | "high" | "medium" | "low" | "info" | "neutral"> = {
@@ -32,6 +32,146 @@ function flattenArtifacts(artifacts: ArtifactAnalysis[]): ArtifactAnalysis[] {
 
 function formatBytes(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
+}
+
+function formatCoordinates(artifact: { groupId: string | null; artifactId: string | null; version: string | null }) {
+  return `${artifact.groupId ?? "unknown"}:${artifact.artifactId ?? "unknown"}:${artifact.version ?? "unknown"}`;
+}
+
+function NestedLibraryTable({ libraries }: { libraries: NestedLibrarySummary[] }) {
+  return (
+    <div className="overflow-hidden rounded-3xl border border-border/70">
+      <table className="min-w-full divide-y divide-border/70 text-sm">
+        <thead className="bg-secondary/60 text-left">
+          <tr>
+            {["Library", "Coordinates", "Size", "Java", "Findings"].map((header) => (
+              <th key={header} className="px-4 py-3 font-medium text-muted-foreground">{header}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-border/60 bg-background/70">
+          {libraries.map((library) => (
+            <tr key={`${library.fileName}-${library.sizeBytes}`}>
+              <td className="px-4 py-3">{library.fileName}</td>
+              <td className="px-4 py-3 text-muted-foreground">{formatCoordinates(library.coordinates)}</td>
+              <td className="px-4 py-3">{formatBytes(library.sizeBytes)}</td>
+              <td className="px-4 py-3">{library.javaVersion}</td>
+              <td className="px-4 py-3">{library.vulnerabilityCount}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function ProjectStructurePanel({ projectStructure }: { projectStructure: ProjectStructureSummary }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Project structure summary</CardTitle>
+        <CardDescription>
+          Best-effort ZIP structure detection, root POM heuristics, packaged archives, compiled classes, and metadata evidence.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+          {[
+            ["Root POM", projectStructure.rootPomPath ?? "Not detected"],
+            ["POM files", projectStructure.pomCount],
+            ["Packaged artifacts", projectStructure.packagedArtifactCount],
+            ["Class dirs", projectStructure.compiledClassDirectoryCount],
+            ["Lib dirs", projectStructure.dependencyLibraryDirectoryCount],
+            ["Compiled Java", projectStructure.compiledClassesJavaVersion.requiredJava],
+          ].map(([label, value]) => (
+            <div key={String(label)} className="rounded-2xl border border-border/70 bg-background/60 px-4 py-4">
+              <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{label}</div>
+              <div className="mt-2 text-sm font-medium break-words">{value}</div>
+            </div>
+          ))}
+        </div>
+        <div className="grid gap-4 lg:grid-cols-2">
+          {[
+            ["Detected POMs", projectStructure.pomFiles],
+            ["Modules", projectStructure.moduleDirectories],
+            ["Packaged artifacts", projectStructure.packagedArtifacts],
+            ["Dependency lib dirs", projectStructure.dependencyLibraryDirectories],
+            ["Spring metadata", projectStructure.springMetadataFiles],
+            ["ServiceLoader metadata", projectStructure.serviceLoaderFiles],
+          ].map(([label, rows]) => (
+            <div key={String(label)} className="rounded-2xl border border-border/70 bg-background/60 px-4 py-4">
+              <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{label}</div>
+              <div className="mt-3 space-y-1 text-sm text-muted-foreground">
+                {Array.isArray(rows) && rows.length > 0 ? rows.map((row) => <div key={row}>{row}</div>) : <div>None detected</div>}
+              </div>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function FatJarInspectorTab({ artifact }: { artifact: ArtifactAnalysis }) {
+  const inspection = artifact.packagingInspection;
+  if (!inspection || inspection.packagingType === "PLAIN_ARCHIVE") {
+    return (
+      <div className="rounded-2xl border border-border/70 bg-background/60 px-4 py-5 text-sm text-muted-foreground">
+        This artifact is not a fat JAR, WAR, or EAR with an inspectable bundled-dependency layout.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-4">
+        {[
+          ["Packaging type", inspection.packagingType],
+          ["App classes", inspection.applicationClassesLocation ?? "n/a"],
+          ["Dependency libs", inspection.dependencyLibrariesLocation ?? "n/a"],
+          ["Dependency count", inspection.dependencyCount],
+          ["Nested libs", inspection.nestedLibraryCount],
+          ["Java", inspection.javaVersion],
+          ["Spring Boot", inspection.springBootVersion ?? "n/a"],
+          ["Start-Class", inspection.startClass ?? inspection.mainClass ?? "n/a"],
+        ].map(([label, value]) => (
+          <div key={String(label)} className="rounded-2xl border border-border/70 bg-background/60 px-4 py-4">
+            <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{label}</div>
+            <div className="mt-2 text-sm font-medium break-words">{value}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <div className="rounded-2xl border border-border/70 bg-background/60 px-4 py-4">
+          <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Largest libs</div>
+          <div className="mt-3 space-y-1 text-sm text-muted-foreground">
+            {inspection.largestNestedLibraries.length > 0
+              ? inspection.largestNestedLibraries.map((item) => <div key={item.fileName}>{item.fileName} ({item.vulnerabilityCount} findings)</div>)
+              : <div>None</div>}
+          </div>
+        </div>
+        <div className="rounded-2xl border border-border/70 bg-background/60 px-4 py-4">
+          <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Vulnerable libs</div>
+          <div className="mt-3 space-y-1 text-sm text-muted-foreground">
+            {inspection.vulnerableNestedLibraries.length > 0
+              ? inspection.vulnerableNestedLibraries.map((item) => <div key={item.fileName}>{item.fileName} ({item.vulnerabilityCount} findings)</div>)
+              : <div>None</div>}
+          </div>
+        </div>
+        <div className="rounded-2xl border border-border/70 bg-background/60 px-4 py-4">
+          <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Modules</div>
+          <div className="mt-3 space-y-1 text-sm text-muted-foreground">
+            {inspection.modulePaths.length > 0
+              ? inspection.modulePaths.map((item) => <div key={item}>{item}</div>)
+              : <div>None</div>}
+          </div>
+        </div>
+      </div>
+
+      {inspection.nestedLibraries.length > 0 ? <NestedLibraryTable libraries={inspection.nestedLibraries} /> : null}
+    </div>
+  );
 }
 
 function VulnerabilityTable({ rows }: { rows: VulnerabilityFinding[] }) {
@@ -141,6 +281,8 @@ export function ResultsDashboard({ result, exportJobId, sourceLabel }: ResultsDa
 
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
+      {result.projectStructure ? <ProjectStructurePanel projectStructure={result.projectStructure} /> : null}
+
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         {[
           ["Artifacts", result.summary.totalArtifacts],
@@ -244,6 +386,7 @@ export function ResultsDashboard({ result, exportJobId, sourceLabel }: ResultsDa
                   <Tabs defaultValue="overview">
                     <TabsList>
                       <TabsTrigger value="overview">Overview</TabsTrigger>
+                      <TabsTrigger value="fat-jar-inspector">Fat JAR Inspector</TabsTrigger>
                       <TabsTrigger value="manifest">Manifest</TabsTrigger>
                       <TabsTrigger value="dependencies">Dependencies</TabsTrigger>
                       <TabsTrigger value="vulnerabilities">Vulnerabilities</TabsTrigger>
@@ -264,6 +407,10 @@ export function ResultsDashboard({ result, exportJobId, sourceLabel }: ResultsDa
                           <div className="mt-2 break-all text-sm font-medium">{value}</div>
                         </div>
                       ))}
+                    </TabsContent>
+
+                    <TabsContent value="fat-jar-inspector">
+                      <FatJarInspectorTab artifact={artifact} />
                     </TabsContent>
 
                     <TabsContent value="manifest">

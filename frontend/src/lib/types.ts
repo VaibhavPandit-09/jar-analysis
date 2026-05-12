@@ -1,5 +1,5 @@
 export type JobStatus = "QUEUED" | "RUNNING" | "COMPLETED" | "FAILED" | "CANCELLED";
-export type InputType = "ARCHIVE_UPLOAD" | "POM";
+export type InputType = "ARCHIVE_UPLOAD" | "POM" | "PROJECT_ZIP";
 export type Severity = "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" | "INFO" | "UNKNOWN";
 export type ProgressEventType =
   | "STARTED"
@@ -12,8 +12,13 @@ export type ProgressEventType =
 export type ProgressPhase =
   | "PREPARING"
   | "VALIDATING_UPLOAD"
+  | "EXTRACTING_PROJECT_ZIP"
+  | "DETECTING_PROJECT_STRUCTURE"
   | "MAVEN_RESOLUTION"
   | "ANALYZING"
+  | "ANALYZING_PACKAGED_ARTIFACTS"
+  | "INSPECTING_WAR_EAR"
+  | "INSPECTING_FAT_JAR"
   | "VULNERABILITY_SCAN"
   | "REPORTING"
   | "COMPLETED"
@@ -85,6 +90,62 @@ export interface ArtifactAnalysis {
   vulnerabilities: VulnerabilityFinding[];
   nestedArtifacts: ArtifactAnalysis[];
   rawMetadata: Record<string, unknown>;
+  packagingInspection: PackagingInspection | null;
+}
+
+export interface NestedLibrarySummary {
+  fileName: string;
+  sizeBytes: number;
+  javaVersion: string;
+  vulnerabilityCount: number;
+  coordinates: MavenCoordinates;
+}
+
+export interface PackagingInspection {
+  packagingType: string;
+  applicationClassesLocation: string | null;
+  dependencyLibrariesLocation: string | null;
+  applicationClassCount: number;
+  dependencyCount: number;
+  nestedLibraryCount: number;
+  nestedLibraries: NestedLibrarySummary[];
+  largestNestedLibraries: NestedLibrarySummary[];
+  vulnerableNestedLibraries: NestedLibrarySummary[];
+  javaVersion: string;
+  springBootVersion: string | null;
+  startClass: string | null;
+  mainClass: string | null;
+  layersIndexPresent: boolean;
+  classpathIndexPresent: boolean;
+  webXmlPresent: boolean;
+  applicationXmlPresent: boolean;
+  webInfLibCount: number;
+  warModuleCount: number;
+  jarModuleCount: number;
+  modulePaths: string[];
+  springMetadataFiles: string[];
+  serviceLoaderFiles: string[];
+  configFiles: string[];
+  duplicateClassesStatus: string;
+}
+
+export interface ProjectStructureSummary {
+  archiveName: string;
+  rootPomPath: string | null;
+  rootPomReason: string | null;
+  pomCount: number;
+  packagedArtifactCount: number;
+  compiledClassDirectoryCount: number;
+  dependencyLibraryDirectoryCount: number;
+  pomFiles: string[];
+  moduleDirectories: string[];
+  compiledClassDirectories: string[];
+  packagedArtifacts: string[];
+  dependencyLibraryDirectories: string[];
+  springMetadataFiles: string[];
+  serviceLoaderFiles: string[];
+  resourceFiles: string[];
+  compiledClassesJavaVersion: JavaVersionInfo;
 }
 
 export interface AnalysisSummary {
@@ -113,6 +174,7 @@ export interface AnalysisResult {
   dependencyTreeText: string | null;
   warnings: string[];
   errors: string[];
+  projectStructure: ProjectStructureSummary | null;
 }
 
 export interface AnalysisJobStatus {

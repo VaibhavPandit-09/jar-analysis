@@ -17,10 +17,12 @@ class MavenResolutionServiceTests {
                     "dependency-check.sh",
                     4,
                     10_000_000,
+                    500,
+                    20_000_000,
                     60,
                     "runtime"
             )
-    );
+        );
 
     @Test
     void buildsCopyDependenciesCommandSafely() {

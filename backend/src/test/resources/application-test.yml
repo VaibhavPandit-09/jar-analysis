@@ -3,6 +3,8 @@ jarscan:
   data-dir: ${user.dir}/target/test-data
   db-path: ${user.dir}/target/test-data/jarscan.db
   dependency-check-command: dependency-check.sh
+  project-zip-max-files: 500
+  project-zip-max-extracted-size-bytes: 20000000
 
 spring:
   flyway:

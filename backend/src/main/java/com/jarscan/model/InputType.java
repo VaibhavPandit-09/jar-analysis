@@ -2,5 +2,6 @@ package com.jarscan.model;
 
 public enum InputType {
     ARCHIVE_UPLOAD,
-    POM
+    POM,
+    PROJECT_ZIP
 }

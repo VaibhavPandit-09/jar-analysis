@@ -68,6 +68,7 @@ Current package layout under `backend/src/main/java/com/jarscan`:
 - validates uploads
 - creates per-job workspaces
 - decides archive versus `pom.xml` flow
+- now also handles project ZIP extraction and structure detection flow
 - orchestrates Maven resolution, artifact analysis, vulnerability scanning, and final result creation
 - publishes SSE progress events
 - handles cancellation
@@ -101,6 +102,20 @@ Current package layout under `backend/src/main/java/com/jarscan`:
 - extracts Maven coordinates
 - detects module metadata
 - recursively analyzes nested archives
+- now records packaging inspection metadata for fat JAR, WAR, and EAR layouts
+
+### `ProjectArchiveService`
+
+- safely extracts uploaded project ZIP files into job-local workspaces
+- enforces zip-slip protection
+- enforces extracted-size and file-count limits
+
+### `ProjectStructureDetector`
+
+- scans extracted project ZIP contents
+- finds `pom.xml` files and selects a best-effort root POM
+- detects packaged archives, compiled class directories, dependency library directories, Spring metadata, ServiceLoader metadata, and resource files
+- derives a project structure summary for result JSON and UI rendering
 
 ### `MavenResolutionService`
 

@@ -42,7 +42,7 @@ public final class AnalysisSummaryFactory {
                 .filter(artifact -> artifact.vulnerabilityCount() > 0 || artifact.highestSeverity() != Severity.UNKNOWN)
                 .count();
 
-        int totalDependencies = inputType == InputType.POM
+        int totalDependencies = (inputType == InputType.POM || inputType == InputType.PROJECT_ZIP)
                 ? flattenedArtifacts.size()
                 : Math.max(0, flattenedArtifacts.size() - artifacts.size());
 

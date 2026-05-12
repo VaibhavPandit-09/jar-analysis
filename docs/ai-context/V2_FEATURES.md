@@ -24,13 +24,16 @@ This file documents the planned JARScan v2 feature set. These items are roadmap 
 ## Project ZIP Support
 
 - upload project ZIPs
-- inspect Maven/Gradle project structure where practical
-- derive dependency usage evidence from project contents
+- safely extract project ZIPs with bounded limits
+- inspect Maven project structure where practical
+- detect root POMs, packaged archives, compiled classes, Spring metadata, and ServiceLoader metadata
 
 ## WAR/EAR Intelligence
 
 - deeper inspection of `WEB-INF/lib`, application libs, and related packaging layouts
 - better bundled-dependency understanding
+- WAR summaries for `WEB-INF/classes`, `WEB-INF/lib`, `web.xml`, config files, and Java version hints
+- EAR summaries for `application.xml`, WAR/JAR modules, lib archives, and nested dependency structure
 
 ## Dependency Tree Visualization
 
@@ -91,6 +94,7 @@ This file documents the planned JARScan v2 feature set. These items are roadmap 
 
 - richer inspection of bundled dependencies in application archives
 - better nested-library UX
+- Spring Boot executable JAR detection, boot manifest fields, `layers.idx`, `classpath.idx`, and nested library summaries
 
 ## Policy Engine
 

@@ -22,12 +22,17 @@ These routes are defined in `frontend/src/App.tsx`.
 - manages file selection state
 - validates the upload mix
 - starts jobs through `/api/jobs`
+- now supports:
+  - archive mode (`.jar`, `.war`, `.ear`)
+  - POM mode (`pom.xml`)
+  - project mode (`.zip`)
 
 ### `JobProgressPage`
 
 - polls job status
 - subscribes to `/api/jobs/{jobId}/events`
 - renders progress bar, phase timeline, live log panel, and cancel action
+- shows additional phases for project ZIP extraction, structure detection, packaged artifact analysis, WAR/EAR inspection, and fat JAR inspection
 
 ### `ResultsPage`
 
@@ -38,6 +43,8 @@ These routes are defined in `frontend/src/App.tsx`.
 - supports export links
 - shows dependency-tree text when present
 - reuses the same dashboard UI for fresh and reopened persisted scans
+- shows project structure summary when the scan came from a project ZIP
+- exposes a Fat JAR Inspector tab per artifact for fat JAR, WAR, and EAR packaging details
 
 ### `ScanHistoryPage`
 
@@ -163,12 +170,14 @@ The new settings page also uses page-local SSE for vulnerability DB sync events.
 
 Current results page structure:
 
+- optional project structure summary cards
 - top summary cards
 - severity summary cards
 - filters for text query and severity
 - artifact accordion list
 - per-artifact tabs:
   - overview
+  - fat jar inspector
   - manifest
   - dependencies
   - vulnerabilities

@@ -6,10 +6,12 @@ import com.jarscan.dto.DependencyInfo;
 import com.jarscan.dto.JavaVersionInfo;
 import com.jarscan.dto.ManifestInfo;
 import com.jarscan.dto.MavenCoordinates;
+import com.jarscan.dto.PackagingInspection;
 import com.jarscan.model.ModuleType;
 import com.jarscan.model.Severity;
 import com.jarscan.util.HashUtils;
 import com.jarscan.util.JavaVersionMapper;
+import com.jarscan.util.PackagingInspectionFactory;
 import org.springframework.stereotype.Service;
 
 import java.io.DataInputStream;
@@ -66,14 +68,32 @@ public class JarAnalyzerService {
             Set<String> ancestry
     ) throws IOException {
         String sha256 = HashUtils.sha256(path);
+        String archiveType = archiveType(path);
         try (JarFile jarFile = new JarFile(path.toFile())) {
             int entryCount = 0;
             boolean fatJar = false;
             boolean moduleInfoPresent = false;
+            boolean bootInfClassesPresent = false;
+            boolean bootInfLibPresent = false;
+            boolean webInfClassesPresent = false;
+            boolean webInfLibPresent = false;
+            boolean libDirectoryPresent = false;
+            boolean webXmlPresent = false;
+            boolean applicationXmlPresent = false;
+            boolean classpathIndexPresent = false;
+            boolean layersIndexPresent = false;
             List<String> sampleEntries = new ArrayList<>();
             List<ArtifactAnalysis> nestedArtifacts = new ArrayList<>();
+            List<String> modulePaths = new ArrayList<>();
+            List<String> springMetadataFiles = new ArrayList<>();
+            List<String> serviceLoaderFiles = new ArrayList<>();
+            List<String> configFiles = new ArrayList<>();
             Integer minMajor = null;
             Integer maxMajor = null;
+            int applicationClassCount = 0;
+            int webInfLibCount = 0;
+            int warModuleCount = 0;
+            int jarModuleCount = 0;
             MavenCoordinates coordinates = new MavenCoordinates(null, null, null);
             ancestry.add(sha256);
             var entries = jarFile.entries();
@@ -89,12 +109,60 @@ public class JarAnalyzerService {
                 if ("module-info.class".equals(entry.getName())) {
                     moduleInfoPresent = true;
                 }
-                if (!fatJar && (entry.getName().startsWith("BOOT-INF/lib/")
-                        || entry.getName().startsWith("WEB-INF/lib/")
-                        || entry.getName().startsWith("lib/"))) {
+                if (entry.getName().startsWith("BOOT-INF/classes/")) {
+                    bootInfClassesPresent = true;
+                }
+                if (entry.getName().startsWith("BOOT-INF/lib/")) {
+                    bootInfLibPresent = true;
+                    if (!entry.isDirectory()) {
+                        webInfLibCount++;
+                    }
+                }
+                if (entry.getName().startsWith("WEB-INF/classes/")) {
+                    webInfClassesPresent = true;
+                }
+                if (entry.getName().startsWith("WEB-INF/lib/")) {
+                    webInfLibPresent = true;
+                    if (!entry.isDirectory()) {
+                        webInfLibCount++;
+                    }
+                }
+                if (entry.getName().startsWith("lib/")) {
+                    libDirectoryPresent = true;
+                }
+                if (!fatJar && (bootInfLibPresent || webInfLibPresent || libDirectoryPresent)) {
                     fatJar = true;
                 }
-                if (shouldAnalyzeNested(entry, depth)) {
+                if ("WEB-INF/web.xml".equals(entry.getName())) {
+                    webXmlPresent = true;
+                }
+                if ("META-INF/application.xml".equals(entry.getName())) {
+                    applicationXmlPresent = true;
+                }
+                if ("BOOT-INF/classpath.idx".equals(entry.getName()) || "classpath.idx".equals(entry.getName())) {
+                    classpathIndexPresent = true;
+                }
+                if ("BOOT-INF/layers.idx".equals(entry.getName()) || "layers.idx".equals(entry.getName())) {
+                    layersIndexPresent = true;
+                }
+                if (isSpringMetadata(entry.getName())) {
+                    springMetadataFiles.add(entry.getName());
+                }
+                if (isServiceLoaderMetadata(entry.getName())) {
+                    serviceLoaderFiles.add(entry.getName());
+                }
+                if (isConfigFile(entry.getName())) {
+                    configFiles.add(entry.getName());
+                }
+                if (isEarModule(archiveType, entry)) {
+                    modulePaths.add(entry.getName());
+                    if (entry.getName().toLowerCase().endsWith(".war")) {
+                        warModuleCount++;
+                    } else if (entry.getName().toLowerCase().endsWith(".jar")) {
+                        jarModuleCount++;
+                    }
+                }
+                if (shouldAnalyzeNested(entry, depth, archiveType)) {
                     ArtifactAnalysis nestedArtifact = extractAndAnalyzeNestedJar(
                             jarFile,
                             entry,
@@ -115,12 +183,45 @@ public class JarAnalyzerService {
                         minMajor = minMajor == null ? majorVersion : Math.min(minMajor, majorVersion);
                         maxMajor = maxMajor == null ? majorVersion : Math.max(maxMajor, majorVersion);
                     }
+                    if (entry.getName().startsWith("BOOT-INF/classes/")
+                            || entry.getName().startsWith("WEB-INF/classes/")
+                            || ("JAR".equals(archiveType)
+                            && !entry.getName().startsWith("BOOT-INF/lib/")
+                            && !entry.getName().startsWith("WEB-INF/lib/")
+                            && !entry.getName().startsWith("META-INF/"))) {
+                        applicationClassCount++;
+                    }
                 }
             }
 
             ManifestInfo manifestInfo = readManifestInfo(jarFile.getManifest());
             ModuleType moduleType = determineModuleType(moduleInfoPresent, manifestInfo.automaticModuleName());
             boolean multiRelease = "true".equalsIgnoreCase(manifestInfo.multiRelease());
+            JavaVersionInfo javaVersionInfo = new JavaVersionInfo(minMajor, maxMajor, JavaVersionMapper.describe(maxMajor), multiRelease);
+            PackagingInspection packagingInspection = buildPackagingInspection(
+                    archiveType,
+                    fatJar,
+                    bootInfClassesPresent,
+                    bootInfLibPresent,
+                    webInfClassesPresent,
+                    webInfLibPresent,
+                    libDirectoryPresent,
+                    webXmlPresent,
+                    applicationXmlPresent,
+                    classpathIndexPresent,
+                    layersIndexPresent,
+                    applicationClassCount,
+                    webInfLibCount,
+                    warModuleCount,
+                    jarModuleCount,
+                    nestedArtifacts,
+                    modulePaths,
+                    springMetadataFiles,
+                    serviceLoaderFiles,
+                    configFiles,
+                    javaVersionInfo,
+                    manifestInfo
+            );
             return new ArtifactAnalysis(
                     UUID.randomUUID().toString(),
                     displayName,
@@ -131,7 +232,7 @@ public class JarAnalyzerService {
                     parentPath,
                     depth,
                     coordinates,
-                    new JavaVersionInfo(minMajor, maxMajor, JavaVersionMapper.describe(maxMajor), multiRelease),
+                    javaVersionInfo,
                     manifestInfo,
                     moduleType,
                     Severity.UNKNOWN,
@@ -140,12 +241,13 @@ public class JarAnalyzerService {
                     List.of(),
                     nestedArtifacts,
                     Map.of(
-                            "archiveType", archiveType(path),
+                            "archiveType", archiveType,
                             "sampleEntries", sampleEntries,
                             "moduleInfoPresent", moduleInfoPresent,
                             "coordinatesKnown", coordinates.isKnown(),
                             "sourcePath", path.toAbsolutePath().toString()
-                    )
+                    ),
+                    packagingInspection
             );
         } finally {
             ancestry.remove(sha256);
@@ -208,7 +310,7 @@ public class JarAnalyzerService {
         return ModuleType.CLASSPATH_JAR;
     }
 
-    private boolean shouldAnalyzeNested(ZipEntry entry, int depth) {
+    private boolean shouldAnalyzeNested(ZipEntry entry, int depth, String archiveType) {
         if (depth >= properties.maxNestedJarDepth()) {
             return false;
         }
@@ -219,7 +321,9 @@ public class JarAnalyzerService {
         boolean inKnownContainer = name.startsWith("BOOT-INF/lib/")
                 || name.startsWith("WEB-INF/lib/")
                 || name.startsWith("lib/");
-        return inKnownContainer && (name.endsWith(".jar") || name.endsWith(".war"));
+        boolean earModule = "EAR".equals(archiveType) && !name.contains("/")
+                && (name.endsWith(".jar") || name.endsWith(".war"));
+        return (inKnownContainer || earModule) && (name.endsWith(".jar") || name.endsWith(".war") || name.endsWith(".ear"));
     }
 
     private ArtifactAnalysis extractAndAnalyzeNestedJar(
@@ -341,5 +445,100 @@ public class JarAnalyzerService {
         }
         String text = nodes.item(0).getTextContent();
         return text == null || text.isBlank() ? null : text.trim();
+    }
+
+    private PackagingInspection buildPackagingInspection(
+            String archiveType,
+            boolean fatJar,
+            boolean bootInfClassesPresent,
+            boolean bootInfLibPresent,
+            boolean webInfClassesPresent,
+            boolean webInfLibPresent,
+            boolean libDirectoryPresent,
+            boolean webXmlPresent,
+            boolean applicationXmlPresent,
+            boolean classpathIndexPresent,
+            boolean layersIndexPresent,
+            int applicationClassCount,
+            int webInfLibCount,
+            int warModuleCount,
+            int jarModuleCount,
+            List<ArtifactAnalysis> nestedArtifacts,
+            List<String> modulePaths,
+            List<String> springMetadataFiles,
+            List<String> serviceLoaderFiles,
+            List<String> configFiles,
+            JavaVersionInfo javaVersionInfo,
+            ManifestInfo manifestInfo
+    ) {
+        String packagingType = "PLAIN_ARCHIVE";
+        String applicationClassesLocation = null;
+        String dependencyLibrariesLocation = null;
+
+        if ("WAR".equals(archiveType)) {
+            packagingType = "WAR";
+            applicationClassesLocation = webInfClassesPresent ? "WEB-INF/classes" : null;
+            dependencyLibrariesLocation = webInfLibPresent ? "WEB-INF/lib" : null;
+        } else if ("EAR".equals(archiveType)) {
+            packagingType = "EAR";
+            dependencyLibrariesLocation = libDirectoryPresent ? "lib" : null;
+        } else if (bootInfLibPresent || manifestInfo.attributes().containsKey("Spring-Boot-Version") || manifestInfo.attributes().containsKey("Start-Class")) {
+            packagingType = "SPRING_BOOT_EXECUTABLE_JAR";
+            applicationClassesLocation = bootInfClassesPresent ? "BOOT-INF/classes" : null;
+            dependencyLibrariesLocation = bootInfLibPresent ? "BOOT-INF/lib" : null;
+        } else if (fatJar || libDirectoryPresent || webInfLibPresent) {
+            packagingType = "SHADED_OR_UBER_JAR";
+            applicationClassesLocation = bootInfClassesPresent ? "BOOT-INF/classes" : (webInfClassesPresent ? "WEB-INF/classes" : "archive root");
+            dependencyLibrariesLocation = bootInfLibPresent ? "BOOT-INF/lib" : (webInfLibPresent ? "WEB-INF/lib" : (libDirectoryPresent ? "lib" : null));
+        }
+
+        return PackagingInspectionFactory.create(
+                packagingType,
+                applicationClassesLocation,
+                dependencyLibrariesLocation,
+                applicationClassCount,
+                javaVersionInfo.requiredJava(),
+                manifestInfo.attributes().get("Spring-Boot-Version"),
+                manifestInfo.attributes().get("Start-Class"),
+                manifestInfo.mainClass(),
+                layersIndexPresent,
+                classpathIndexPresent,
+                webXmlPresent,
+                applicationXmlPresent,
+                webInfLibCount,
+                warModuleCount,
+                jarModuleCount,
+                modulePaths,
+                springMetadataFiles,
+                serviceLoaderFiles,
+                configFiles,
+                "Session 8 duplicate class analysis placeholder",
+                nestedArtifacts
+        );
+    }
+
+    private boolean isSpringMetadata(String entryName) {
+        String lower = entryName.toLowerCase();
+        return lower.endsWith("spring.factories") || lower.endsWith("autoconfiguration.imports");
+    }
+
+    private boolean isServiceLoaderMetadata(String entryName) {
+        String normalized = entryName.replace('\\', '/').toLowerCase();
+        return normalized.startsWith("meta-inf/services/") || normalized.contains("/meta-inf/services/");
+    }
+
+    private boolean isConfigFile(String entryName) {
+        String lower = entryName.toLowerCase();
+        return lower.endsWith("application.properties")
+                || lower.endsWith("application.yml")
+                || lower.endsWith("application.yaml");
+    }
+
+    private boolean isEarModule(String archiveType, ZipEntry entry) {
+        String lower = entry.getName().toLowerCase();
+        return "EAR".equals(archiveType)
+                && !entry.isDirectory()
+                && !entry.getName().contains("/")
+                && (lower.endsWith(".war") || lower.endsWith(".jar"));
     }
 }

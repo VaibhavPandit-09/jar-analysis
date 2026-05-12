@@ -9,9 +9,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 
 const ACCEPTED = {
   "application/java-archive": [".jar"],
+  "application/zip": [".zip"],
+  "application/x-zip-compressed": [".zip"],
   "application/xml": [".xml"],
   "text/xml": [".xml"],
-  "application/octet-stream": [".jar", ".war", ".ear"],
+  "application/octet-stream": [".jar", ".war", ".ear", ".zip"],
 };
 
 interface UploadZoneProps {
@@ -48,10 +50,10 @@ export function UploadZone({
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <CardTitle>Drop Java archives or a Maven descriptor</CardTitle>
+            <CardTitle>Drop Java archives, a Maven descriptor, or a project ZIP</CardTitle>
             <CardDescription>
-              Upload JARs for direct inspection, or upload a single <code>pom.xml</code> to resolve full
-              transitive dependencies inside the container.
+              Archive mode accepts JAR/WAR/EAR files, POM mode accepts one <code>pom.xml</code>, and Project mode accepts one
+              source or build ZIP for safe extraction and best-effort structure detection.
             </CardDescription>
           </div>
           <Badge variant="info" className="hidden sm:inline-flex">
@@ -76,26 +78,26 @@ export function UploadZone({
             </div>
             <div className="space-y-3">
               <h2 className="font-display text-2xl font-semibold tracking-tight">
-                {isDragActive ? "Release files to queue analysis" : "Inspect JARs, WARs, EARs, and POMs"}
+                {isDragActive ? "Release files to queue analysis" : "Inspect archives, Maven builds, and project ZIPs"}
               </h2>
               <p className="mx-auto max-w-xl text-sm leading-6 text-muted-foreground">
                 JARScan reads archive structure, Java bytecode versions, manifest data, embedded Maven metadata,
-                nested dependencies, and local vulnerability findings without ever executing uploaded code.
+                nested dependencies, project structure hints, and local vulnerability findings without ever executing uploaded code.
               </p>
             </div>
 
             <div className="flex flex-wrap items-center justify-center gap-3">
               <Button onClick={open}>Browse files</Button>
-              <Badge variant="neutral">Accepts `.jar`, `.war`, `.ear`, and `pom.xml`</Badge>
+              <Badge variant="neutral">Accepts `.jar`, `.war`, `.ear`, `.zip`, and `pom.xml`</Badge>
             </div>
           </div>
         </div>
 
         <div className="grid gap-3 md:grid-cols-3">
           {[
-            "Upload JARs for direct analysis",
-            "Upload pom.xml for full Maven dependency resolution",
-            "First Dependency-Check DB update can be slow",
+            "Archive mode: upload one or more JAR/WAR/EAR files",
+            "POM mode: upload one pom.xml for Maven dependency resolution",
+            "Project mode: upload one ZIP for safe extraction and structure detection",
           ].map((hint) => (
             <div key={hint} className="rounded-2xl border border-border/70 bg-secondary/40 px-4 py-3 text-sm text-muted-foreground">
               {hint}
@@ -126,12 +128,18 @@ export function UploadZone({
             <div className="grid gap-3">
               {files.length === 0 ? (
                 <div className="rounded-2xl border border-border/70 bg-background/60 px-4 py-6 text-sm text-muted-foreground">
-                  Add one or more Java archives, or a single <code>pom.xml</code>.
+                  Add one or more Java archives, one <code>pom.xml</code>, or one project <code>.zip</code>.
+                </div>
+              ) : null}
+              {files.length === 0 ? (
+                <div className="rounded-2xl border border-border/70 bg-background/60 px-4 py-6 text-sm text-muted-foreground">
+                  First Dependency-Check DB update can still be slow on a cold local cache.
                 </div>
               ) : null}
 
               {files.map((file) => {
                 const isPom = file.name.toLowerCase() === "pom.xml";
+                const isZip = file.name.toLowerCase().endsWith(".zip");
                 return (
                   <motion.div
                     key={`${file.name}-${file.size}`}
@@ -147,7 +155,7 @@ export function UploadZone({
                       <div className="min-w-0">
                         <div className="truncate font-medium text-foreground">{file.name}</div>
                         <div className="text-sm text-muted-foreground">
-                          {(file.size / 1024 / 1024).toFixed(2)} MB
+                          {(file.size / 1024 / 1024).toFixed(2)} MB {isZip ? "• Project ZIP" : isPom ? "• POM mode" : "• Archive mode"}
                         </div>
                       </div>
                     </div>

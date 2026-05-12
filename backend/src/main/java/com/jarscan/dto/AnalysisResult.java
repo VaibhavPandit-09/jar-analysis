@@ -16,6 +16,7 @@ public record AnalysisResult(
         List<ArtifactAnalysis> artifacts,
         String dependencyTreeText,
         List<String> warnings,
-        List<String> errors
+        List<String> errors,
+        ProjectStructureSummary projectStructure
 ) {
 }

@@ -5,6 +5,7 @@ import com.jarscan.dto.AnalysisJobStatusResponse;
 import com.jarscan.dto.AnalysisResult;
 import com.jarscan.dto.ArtifactAnalysis;
 import com.jarscan.dto.ProgressEvent;
+import com.jarscan.dto.ProjectStructureSummary;
 import com.jarscan.job.AnalysisJob;
 import com.jarscan.job.JobCancelledException;
 import com.jarscan.maven.MavenResolutionResult;
@@ -28,6 +29,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -44,6 +46,8 @@ public class AnalysisJobService {
     private final MavenResolutionService mavenResolutionService;
     private final VulnerabilityScannerService vulnerabilityScannerService;
     private final ScanHistoryService scanHistoryService;
+    private final ProjectArchiveService projectArchiveService;
+    private final ProjectStructureDetector projectStructureDetector;
 
     public AnalysisJobService(
             ExecutorService analysisExecutor,
@@ -51,7 +55,9 @@ public class AnalysisJobService {
             JarAnalyzerService jarAnalyzerService,
             MavenResolutionService mavenResolutionService,
             VulnerabilityScannerService vulnerabilityScannerService,
-            ScanHistoryService scanHistoryService
+            ScanHistoryService scanHistoryService,
+            ProjectArchiveService projectArchiveService,
+            ProjectStructureDetector projectStructureDetector
     ) {
         this.analysisExecutor = analysisExecutor;
         this.progressEventService = progressEventService;
@@ -59,6 +65,8 @@ public class AnalysisJobService {
         this.mavenResolutionService = mavenResolutionService;
         this.vulnerabilityScannerService = vulnerabilityScannerService;
         this.scanHistoryService = scanHistoryService;
+        this.projectArchiveService = projectArchiveService;
+        this.projectStructureDetector = projectStructureDetector;
     }
 
     public AnalysisJobResponse createJob(List<MultipartFile> files) {
@@ -137,6 +145,7 @@ public class AnalysisJobService {
             List<ArtifactAnalysis> artifacts = new ArrayList<>();
             List<Path> analysisTargets = storedFiles;
             String dependencyTreeText = null;
+            ProjectStructureSummary projectStructure = null;
             if (job.inputType() == InputType.POM) {
                 Path pomPath = storedFiles.getFirst();
                 publish(job, ProgressEventType.PROGRESS, ProgressPhase.MAVEN_RESOLUTION, "Preparing Maven workspace", 20, pomPath.getFileName().toString(), 0, 1);
@@ -150,19 +159,44 @@ public class AnalysisJobService {
                         null,
                         analysisTargets.size(),
                         analysisTargets.size());
+            } else if (job.inputType() == InputType.PROJECT_ZIP) {
+                Path zipPath = storedFiles.getFirst();
+                publish(job, ProgressEventType.PROGRESS, ProgressPhase.EXTRACTING_PROJECT_ZIP, "Extracting project ZIP", 20, zipPath.getFileName().toString(), 0, 1);
+                Path projectRoot = projectArchiveService.extractProjectArchive(zipPath, job.workspaceDir());
+                checkCancelled(job);
+
+                publish(job, ProgressEventType.PROGRESS, ProgressPhase.DETECTING_PROJECT_STRUCTURE, "Detecting project structure", 30, projectRoot.getFileName().toString(), 0, 1);
+                ProjectStructureDetector.ProjectStructureDetection detection = projectStructureDetector.detect(projectRoot, zipPath.getFileName().toString(), job.warnings());
+                projectStructure = detection.summary();
+
+                List<Path> combinedTargets = new ArrayList<>(detection.packagedArtifacts());
+                if (detection.rootPom() != null) {
+                    publish(job, ProgressEventType.PROGRESS, ProgressPhase.MAVEN_RESOLUTION, "Resolving dependencies from detected root POM", 40, projectStructure.rootPomPath(), 0, 1);
+                    MavenResolutionResult resolutionResult = mavenResolutionService.resolveDependencies(job, detection.rootPom(), "runtime", line ->
+                            publish(job, ProgressEventType.LOG, ProgressPhase.MAVEN_RESOLUTION, line, null, extractCurrentItem(line), null, null));
+                    combinedTargets.addAll(resolutionResult.resolvedArtifacts());
+                    dependencyTreeText = resolutionResult.dependencyTreeText();
+                }
+                analysisTargets = distinctTargets(combinedTargets);
+                if (analysisTargets.isEmpty()) {
+                    job.warnings().add("Project ZIP did not contain packaged archives or resolved dependency artifacts to inspect.");
+                }
             }
 
             int total = analysisTargets.size();
             for (int index = 0; index < analysisTargets.size(); index++) {
                 Path path = analysisTargets.get(index);
-                publish(job, ProgressEventType.PROGRESS, ProgressPhase.ANALYZING,
+                ProgressPhase phase = progressPhaseFor(path, job.inputType());
+                publish(job, ProgressEventType.PROGRESS, phase,
                         "Analyzing " + path.getFileName(),
                         Math.min(95, 20 + ((index * 70) / Math.max(1, total))),
                         path.getFileName().toString(),
                         index,
                         total);
                 checkCancelled(job);
-                artifacts.add(jarAnalyzerService.analyze(path, job.workspaceDir(), job.warnings()));
+                ArtifactAnalysis artifact = jarAnalyzerService.analyze(path, job.workspaceDir(), job.warnings());
+                artifacts.add(artifact);
+                publishInspectionMilestones(job, artifact);
             }
 
             publish(job, ProgressEventType.PROGRESS, ProgressPhase.VULNERABILITY_SCAN,
@@ -184,7 +218,8 @@ public class AnalysisJobService {
                     artifacts,
                     dependencyTreeText,
                     List.copyOf(job.warnings()),
-                    List.copyOf(job.errors())
+                    List.copyOf(job.errors()),
+                    projectStructure
             );
             job.result(result);
             job.status(JobStatus.COMPLETED);
@@ -223,6 +258,13 @@ public class AnalysisJobService {
     }
 
     private InputType detectInputType(List<MultipartFile> files) {
+        boolean projectZipPresent = files.stream()
+                .map(MultipartFile::getOriginalFilename)
+                .filter(name -> name != null)
+                .anyMatch(name -> name.toLowerCase().endsWith(".zip"));
+        if (projectZipPresent) {
+            return InputType.PROJECT_ZIP;
+        }
         boolean pomPresent = files.stream()
                 .map(MultipartFile::getOriginalFilename)
                 .filter(name -> name != null)
@@ -231,6 +273,17 @@ public class AnalysisJobService {
     }
 
     private void validateFiles(List<MultipartFile> files) {
+        long pomCount = files.stream().map(MultipartFile::getOriginalFilename).filter(name -> name != null && name.equalsIgnoreCase("pom.xml")).count();
+        long zipCount = files.stream().map(MultipartFile::getOriginalFilename).filter(name -> name != null && name.toLowerCase().endsWith(".zip")).count();
+        if (pomCount > 1) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only one pom.xml can be uploaded at a time");
+        }
+        if (zipCount > 1) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only one project ZIP can be uploaded at a time");
+        }
+        if ((pomCount > 0 || zipCount > 0) && files.size() > 1) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Upload either one pom.xml, one project ZIP, or one or more archives");
+        }
         for (MultipartFile file : files) {
             String fileName = file.getOriginalFilename();
             if (fileName == null || fileName.isBlank()) {
@@ -240,6 +293,7 @@ public class AnalysisJobService {
             boolean supported = lowerName.endsWith(".jar")
                     || lowerName.endsWith(".war")
                     || lowerName.endsWith(".ear")
+                    || lowerName.endsWith(".zip")
                     || lowerName.equals("pom.xml");
             if (!supported) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported file type: " + fileName);
@@ -320,5 +374,41 @@ public class AnalysisJobService {
             outputStream.write('\n');
         }
         return HashUtils.sha256(outputStream.toByteArray());
+    }
+
+    private List<Path> distinctTargets(List<Path> paths) throws IOException {
+        LinkedHashMap<String, Path> unique = new LinkedHashMap<>();
+        for (Path path : paths) {
+            if (!Files.isRegularFile(path)) {
+                continue;
+            }
+            String key = HashUtils.sha256(path) + ":" + path.getFileName();
+            unique.putIfAbsent(key, path);
+        }
+        return new ArrayList<>(unique.values());
+    }
+
+    private ProgressPhase progressPhaseFor(Path path, InputType inputType) {
+        String lower = path.getFileName().toString().toLowerCase();
+        if (inputType == InputType.PROJECT_ZIP) {
+            return ProgressPhase.ANALYZING_PACKAGED_ARTIFACTS;
+        }
+        if (lower.endsWith(".war") || lower.endsWith(".ear")) {
+            return ProgressPhase.INSPECTING_WAR_EAR;
+        }
+        return ProgressPhase.ANALYZING;
+    }
+
+    private void publishInspectionMilestones(AnalysisJob job, ArtifactAnalysis artifact) {
+        if (artifact.packagingInspection() == null) {
+            return;
+        }
+        String packagingType = artifact.packagingInspection().packagingType();
+        if ("WAR".equals(packagingType) || "EAR".equals(packagingType)) {
+            publish(job, ProgressEventType.PROGRESS, ProgressPhase.INSPECTING_WAR_EAR, "Inspected " + packagingType + " structure for " + artifact.fileName(), null, artifact.fileName(), null, null);
+        }
+        if ("SPRING_BOOT_EXECUTABLE_JAR".equals(packagingType) || "SHADED_OR_UBER_JAR".equals(packagingType)) {
+            publish(job, ProgressEventType.PROGRESS, ProgressPhase.INSPECTING_FAT_JAR, "Inspected bundled dependency layout for " + artifact.fileName(), null, artifact.fileName(), null, null);
+        }
     }
 }
