@@ -143,7 +143,8 @@ public class JarAnalyzerService {
                             "archiveType", archiveType(path),
                             "sampleEntries", sampleEntries,
                             "moduleInfoPresent", moduleInfoPresent,
-                            "coordinatesKnown", coordinates.isKnown()
+                            "coordinatesKnown", coordinates.isKnown(),
+                            "sourcePath", path.toAbsolutePath().toString()
                     )
             );
         } finally {

@@ -20,6 +20,7 @@ server:
 
 jarscan:
   data-dir: ${JARSCAN_DATA_DIR:${user.home}/.jarscan}
+  dependency-check-command: ${JARSCAN_DEPENDENCY_CHECK_COMMAND:dependency-check.sh}
   max-nested-jar-depth: ${JARSCAN_MAX_NESTED_JAR_DEPTH:4}
   max-extracted-archive-size-bytes: ${JARSCAN_MAX_EXTRACTED_ARCHIVE_SIZE_BYTES:268435456}
   maven-timeout-seconds: ${JARSCAN_MAVEN_TIMEOUT_SECONDS:600}

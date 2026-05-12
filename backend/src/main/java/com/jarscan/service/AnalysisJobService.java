@@ -150,6 +150,12 @@ public class AnalysisJobService {
                 artifacts.add(jarAnalyzerService.analyze(path, job.workspaceDir(), job.warnings()));
             }
 
+            publish(job, ProgressEventType.PROGRESS, ProgressPhase.VULNERABILITY_SCAN,
+                    "Checking known vulnerabilities",
+                    92,
+                    null,
+                    artifacts.size(),
+                    artifacts.size());
             artifacts = new ArrayList<>(vulnerabilityScannerService.scanArtifacts(job, artifacts, event ->
                     progressEventService.publish(job, event)));
 
