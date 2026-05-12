@@ -122,7 +122,8 @@ public class AnalysisJobService {
             if (job.inputType() == InputType.POM) {
                 Path pomPath = storedFiles.getFirst();
                 publish(job, ProgressEventType.PROGRESS, ProgressPhase.MAVEN_RESOLUTION, "Preparing Maven workspace", 20, pomPath.getFileName().toString(), 0, 1);
-                MavenResolutionResult resolutionResult = mavenResolutionService.resolveDependencies(job, pomPath, "runtime");
+                MavenResolutionResult resolutionResult = mavenResolutionService.resolveDependencies(job, pomPath, "runtime", ignored -> {
+                });
                 analysisTargets = resolutionResult.resolvedArtifacts();
                 dependencyTreeText = resolutionResult.dependencyTreeText();
             }
