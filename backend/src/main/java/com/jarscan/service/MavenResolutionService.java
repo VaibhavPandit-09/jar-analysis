@@ -72,26 +72,30 @@ public class MavenResolutionService {
         job.activeProcess(process);
 
         StringBuilder output = new StringBuilder();
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                output.append(line).append(System.lineSeparator());
-                logConsumer.accept(line);
-                if (job.isCancelled()) {
-                    process.destroyForcibly();
-                    throw new InterruptedException("Maven resolution cancelled");
+        try {
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    output.append(line).append(System.lineSeparator());
+                    logConsumer.accept(line);
+                    if (job.isCancelled()) {
+                        process.destroyForcibly();
+                        throw new InterruptedException("Maven resolution cancelled");
+                    }
                 }
             }
-        }
 
-        boolean finished = process.waitFor(properties.mavenTimeoutSeconds(), TimeUnit.SECONDS);
-        if (!finished) {
-            process.destroyForcibly();
-            throw new IllegalStateException("Maven command timed out after " + Duration.ofSeconds(properties.mavenTimeoutSeconds()));
+            boolean finished = process.waitFor(properties.mavenTimeoutSeconds(), TimeUnit.SECONDS);
+            if (!finished) {
+                process.destroyForcibly();
+                throw new IllegalStateException("Maven command timed out after " + Duration.ofSeconds(properties.mavenTimeoutSeconds()));
+            }
+            if (process.exitValue() != 0) {
+                throw new IllegalStateException("Maven command failed: " + String.join(" ", command));
+            }
+            return output.toString();
+        } finally {
+            job.activeProcess(null);
         }
-        if (process.exitValue() != 0) {
-            throw new IllegalStateException("Maven command failed: " + String.join(" ", command));
-        }
-        return output.toString();
     }
 }

@@ -122,10 +122,16 @@ public class AnalysisJobService {
             if (job.inputType() == InputType.POM) {
                 Path pomPath = storedFiles.getFirst();
                 publish(job, ProgressEventType.PROGRESS, ProgressPhase.MAVEN_RESOLUTION, "Preparing Maven workspace", 20, pomPath.getFileName().toString(), 0, 1);
-                MavenResolutionResult resolutionResult = mavenResolutionService.resolveDependencies(job, pomPath, "runtime", ignored -> {
-                });
+                MavenResolutionResult resolutionResult = mavenResolutionService.resolveDependencies(job, pomPath, "runtime", line ->
+                        publish(job, ProgressEventType.LOG, ProgressPhase.MAVEN_RESOLUTION, line, null, extractCurrentItem(line), null, null));
                 analysisTargets = resolutionResult.resolvedArtifacts();
                 dependencyTreeText = resolutionResult.dependencyTreeText();
+                publish(job, ProgressEventType.PROGRESS, ProgressPhase.MAVEN_RESOLUTION,
+                        "Resolved " + analysisTargets.size() + " Maven dependencies",
+                        45,
+                        null,
+                        analysisTargets.size(),
+                        analysisTargets.size());
             }
 
             int total = analysisTargets.size();
@@ -260,5 +266,14 @@ public class AnalysisJobService {
                 totalItems,
                 Instant.now()
         ));
+    }
+
+    private String extractCurrentItem(String line) {
+        int jarIndex = line.lastIndexOf(".jar");
+        if (jarIndex < 0) {
+            return null;
+        }
+        int start = Math.max(line.lastIndexOf('/', jarIndex), line.lastIndexOf('\\', jarIndex));
+        return line.substring(start + 1, jarIndex + 4);
     }
 }
