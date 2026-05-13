@@ -2,9 +2,12 @@ package com.jarscan.util;
 
 import com.jarscan.dto.AnalysisSummary;
 import com.jarscan.dto.ArtifactAnalysis;
+import com.jarscan.dto.AwsBundleAdvice;
 import com.jarscan.dto.ConvergenceFinding;
+import com.jarscan.dto.DependencyUsageFinding;
 import com.jarscan.dto.DuplicateClassFinding;
 import com.jarscan.dto.LicenseFinding;
+import com.jarscan.dto.SlimmingOpportunity;
 import com.jarscan.dto.VersionConflictFinding;
 import com.jarscan.dto.VulnerabilityFinding;
 import com.jarscan.model.InputType;
@@ -24,7 +27,10 @@ public final class AnalysisSummaryFactory {
             List<VersionConflictFinding> versionConflicts,
             List<ConvergenceFinding> convergenceFindings,
             List<DuplicateClassFinding> duplicateClassFindings,
-            List<LicenseFinding> licenses
+            List<LicenseFinding> licenses,
+            List<DependencyUsageFinding> dependencyUsageFindings,
+            List<SlimmingOpportunity> slimmingOpportunities,
+            AwsBundleAdvice awsBundleAdvice
     ) {
         List<ArtifactAnalysis> flattenedArtifacts = flattenArtifacts(artifacts);
         List<VulnerabilityFinding> findings = flattenedArtifacts.stream()
@@ -63,6 +69,21 @@ public final class AnalysisSummaryFactory {
         int unknownLicenses = countLicenses(licenses, "unknown");
         int multipleLicenses = countLicenses(licenses, "multiple");
         int licenseWarnings = (int) licenses.stream().filter(license -> !license.warnings().isEmpty()).count();
+        int apparentlyUnusedCount = (int) dependencyUsageFindings.stream()
+                .filter(finding -> "APPARENTLY_UNUSED".equals(finding.status())
+                        || "DECLARED_BUT_UNUSED".equals(finding.status())
+                        || "PACKAGED_BUT_APPARENTLY_UNUSED".equals(finding.status()))
+                .count();
+        int possiblyRuntimeUsedCount = (int) dependencyUsageFindings.stream()
+                .filter(finding -> "POSSIBLY_RUNTIME_USED".equals(finding.status()))
+                .count();
+        long estimatedRemovableSizeBytes = dependencyUsageFindings.stream()
+                .filter(finding -> ("APPARENTLY_UNUSED".equals(finding.status())
+                        || "DECLARED_BUT_UNUSED".equals(finding.status())
+                        || "PACKAGED_BUT_APPARENTLY_UNUSED".equals(finding.status()))
+                        && finding.sizeBytes() != null)
+                .mapToLong(DependencyUsageFinding::sizeBytes)
+                .sum();
 
         return new AnalysisSummary(
                 flattenedArtifacts.size(),
@@ -85,7 +106,12 @@ public final class AnalysisSummaryFactory {
                 weakCopyleftLicenses,
                 strongCopyleftLicenses,
                 unknownLicenses,
-                multipleLicenses
+                multipleLicenses,
+                apparentlyUnusedCount,
+                possiblyRuntimeUsedCount,
+                slimmingOpportunities.size(),
+                estimatedRemovableSizeBytes,
+                awsBundleAdvice == null ? 0 : 1
         );
     }
 

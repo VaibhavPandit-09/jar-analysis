@@ -66,16 +66,19 @@ This file documents the planned JARScan v2 feature set. These items are roadmap 
 
 - detect apparently unused dependencies
 - differentiate confidence levels instead of hard yes/no judgments
+- implemented in Session 9 with evidence, warnings, and suggested actions
 
 ## Dependency Slimming Advisor
 
 - suggest candidates for removal or scope reduction
 - highlight oversized or redundant dependency sets
+- implemented in Session 9 with exclusion and replacement snippets where practical
 
 ## AWS Bundle Advisor
 
 - special guidance for large AWS SDK dependency footprints
 - help identify opportunities to slim AWS-related dependency bundles
+- implemented in Session 9 with bytecode-backed service-module hints and replacement guidance
 
 ## Suppression System
 
@@ -128,3 +131,4 @@ This file documents the planned JARScan v2 feature set. These items are roadmap 
 - settings surfaces
 - dependency tree and drill-down views
 - version conflict, duplicate class, and license review tabs
+- usage analysis and slimming advisor tabs

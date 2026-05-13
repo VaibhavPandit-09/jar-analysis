@@ -44,6 +44,15 @@ This file documents currently visible backend endpoints and planned v2 expansion
     - `licenses`
       - list of `LicenseFinding`
       - fields include `groupId`, `artifactId`, `version`, `licenseName`, `licenseUrl`, `source`, `confidence`, `category`, and `warnings`
+    - `dependencyUsage`
+      - list of `DependencyUsageFinding`
+      - fields include `groupId`, `artifactId`, `version`, `status`, `confidence`, `evidence`, `warnings`, `suggestedAction`, `paths`, `sizeBytes`, and `vulnerabilitiesContributed`
+    - `slimmingOpportunities`
+      - list of `SlimmingOpportunity`
+      - fields include `title`, `dependency`, `opportunityType`, `sizeImpactBytes`, `transitiveDependencyCount`, `vulnerabilitiesContributed`, `usageStatus`, `confidence`, `evidence`, `suggestedReplacement`, `mavenSnippet`, `exclusionSnippet`, and `warnings`
+    - `awsBundleAdvice`
+      - optional `AwsBundleAdvice`
+      - fields include `detectedArtifact`, `usedServiceModules`, `apparentlyUnusedServiceModules`, `suggestedReplacement`, `mavenSnippet`, `warnings`, and `confidence`
     - `dependencyTreeText`
       - raw Maven tree text when text output was used or retained for debugging
 
@@ -163,6 +172,9 @@ The following response DTOs are visible or directly implied by controller/servic
 - `ConvergenceFinding`
 - `DuplicateClassFinding`
 - `LicenseFinding`
+- `DependencyUsageFinding`
+- `SlimmingOpportunity`
+- `AwsBundleAdvice`
 - `NvdSettingsStatusResponse`
 - `NvdSettingsTestResponse`
 - `ProgressEvent`
@@ -193,6 +205,15 @@ Implemented in result payloads:
 - dependency convergence findings with suggested `dependencyManagement` snippets
 - duplicate class and split-package findings across analyzed dependency archives
 - best-effort license extraction and classification from embedded POM metadata, manifest fields, and license files
+
+## Session 9 Usage And Slimming Status
+
+Implemented in result payloads:
+
+- Maven `dependency:analyze` capture and parsing when Maven project context exists
+- bytecode-reference-backed dependency usage findings with confidence, evidence, warnings, and suggested actions
+- slimming opportunities with copyable Maven or exclusion snippets where practical
+- AWS bundle advisor guidance when broad AWS SDK dependencies are detected
 
 ## Planned v2 Settings Endpoints
 

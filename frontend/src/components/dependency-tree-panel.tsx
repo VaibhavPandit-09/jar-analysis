@@ -293,8 +293,8 @@ export function DependencyTreePanel({ tree, dependencyTreeText, vulnerabilityInd
                 </div>
 
                 <div className="grid gap-3 md:grid-cols-2">
-                  <PlaceholderPanel title="Licenses">License analysis lands in Session 8.</PlaceholderPanel>
-                  <PlaceholderPanel title="Usage status">Dependency usage analysis lands in Session 9.</PlaceholderPanel>
+                  <PlaceholderPanel title="Licenses">See the Licenses tab for dependency license evidence and category warnings.</PlaceholderPanel>
+                  <PlaceholderPanel title="Usage status">See the Usage Analysis tab for evidence-based usage status, confidence, warnings, and slimming guidance.</PlaceholderPanel>
                 </div>
 
                 {selectedNode.conflict || selectedNode.omitted ? (

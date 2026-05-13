@@ -81,6 +81,18 @@ Unused dependency analysis is inherently probabilistic because Java applications
 
 Confidence levels communicate useful guidance without overstating certainty.
 
+## Why Maven dependency:analyze Should Not Be Treated As Absolute Truth
+
+Maven `dependency:analyze` is useful evidence, but it does not fully understand every runtime activation pattern. JARScan combines it with bytecode references, resource/config hints, ServiceLoader/Spring metadata, packaging evidence, and runtime heuristics before suggesting removal.
+
+## Why Slimming Advice Must Stay Review-Oriented
+
+Dependency slimming can break runtime behavior in subtle ways, especially with reflection-heavy frameworks, starters, logging bridges, JDBC drivers, and plugin systems. JARScan should generate explanations, confidence, and copyable snippets, but it should not auto-edit uploaded POM files or promise that removal is safe without testing.
+
+## Why AWS Bundle Advice Is Specialized But Still Best-Effort
+
+Broad AWS SDK bundles can hide a lot of removable weight, so a focused advisor is worthwhile. At the same time, AWS usage can also be configuration-driven or spread across multiple services, so JARScan should infer likely service modules from bytecode and metadata but still require manual review and testing before narrowing a bundle.
+
 ## Why This Is Not Source-Code Vulnerability Scanning
 
 JARScan’s scope is dependency intelligence. Expanding into general code-security analysis would change the product into something fundamentally different, increase complexity dramatically, and create false expectations around coverage and correctness.

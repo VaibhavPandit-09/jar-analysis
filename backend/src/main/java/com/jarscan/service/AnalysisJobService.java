@@ -4,15 +4,19 @@ import com.jarscan.dto.AnalysisJobResponse;
 import com.jarscan.dto.AnalysisJobStatusResponse;
 import com.jarscan.dto.AnalysisResult;
 import com.jarscan.dto.ArtifactAnalysis;
+import com.jarscan.dto.AwsBundleAdvice;
 import com.jarscan.dto.ConvergenceFinding;
+import com.jarscan.dto.DependencyUsageFinding;
 import com.jarscan.dto.DependencyTree;
 import com.jarscan.dto.DuplicateClassFinding;
 import com.jarscan.dto.LicenseFinding;
 import com.jarscan.dto.ProgressEvent;
 import com.jarscan.dto.ProjectStructureSummary;
+import com.jarscan.dto.SlimmingOpportunity;
 import com.jarscan.dto.VersionConflictFinding;
 import com.jarscan.job.AnalysisJob;
 import com.jarscan.job.JobCancelledException;
+import com.jarscan.maven.MavenDependencyAnalyzeResult;
 import com.jarscan.maven.MavenResolutionResult;
 import com.jarscan.model.InputType;
 import com.jarscan.model.JobStatus;
@@ -56,6 +60,8 @@ public class AnalysisJobService {
     private final DependencyConflictAnalysisService dependencyConflictAnalysisService;
     private final DuplicateClassAnalysisService duplicateClassAnalysisService;
     private final LicenseAnalysisService licenseAnalysisService;
+    private final DependencyUsageAnalysisService dependencyUsageAnalysisService;
+    private final DependencySlimmingAdvisorService dependencySlimmingAdvisorService;
 
     public AnalysisJobService(
             ExecutorService analysisExecutor,
@@ -68,7 +74,9 @@ public class AnalysisJobService {
             ProjectStructureDetector projectStructureDetector,
             DependencyConflictAnalysisService dependencyConflictAnalysisService,
             DuplicateClassAnalysisService duplicateClassAnalysisService,
-            LicenseAnalysisService licenseAnalysisService
+            LicenseAnalysisService licenseAnalysisService,
+            DependencyUsageAnalysisService dependencyUsageAnalysisService,
+            DependencySlimmingAdvisorService dependencySlimmingAdvisorService
     ) {
         this.analysisExecutor = analysisExecutor;
         this.progressEventService = progressEventService;
@@ -81,6 +89,8 @@ public class AnalysisJobService {
         this.dependencyConflictAnalysisService = dependencyConflictAnalysisService;
         this.duplicateClassAnalysisService = duplicateClassAnalysisService;
         this.licenseAnalysisService = licenseAnalysisService;
+        this.dependencyUsageAnalysisService = dependencyUsageAnalysisService;
+        this.dependencySlimmingAdvisorService = dependencySlimmingAdvisorService;
     }
 
     public AnalysisJobResponse createJob(List<MultipartFile> files) {
@@ -158,17 +168,24 @@ public class AnalysisJobService {
 
             List<ArtifactAnalysis> artifacts = new ArrayList<>();
             List<Path> analysisTargets = storedFiles;
+            List<Path> resolvedArtifacts = new ArrayList<>();
             DependencyTree dependencyTree = null;
             String dependencyTreeText = null;
+            MavenDependencyAnalyzeResult dependencyAnalyzeResult = null;
             ProjectStructureSummary projectStructure = null;
+            Path projectRoot = null;
+            List<Path> compiledClassDirectories = List.of();
+            List<Path> applicationArchives = List.of();
             if (job.inputType() == InputType.POM) {
                 Path pomPath = storedFiles.getFirst();
                 publish(job, ProgressEventType.PROGRESS, ProgressPhase.MAVEN_RESOLUTION, "Preparing Maven workspace", 20, pomPath.getFileName().toString(), 0, 1);
                 MavenResolutionResult resolutionResult = mavenResolutionService.resolveDependencies(job, pomPath, "runtime", line ->
                         publish(job, ProgressEventType.LOG, ProgressPhase.MAVEN_RESOLUTION, line, null, extractCurrentItem(line), null, null));
                 analysisTargets = resolutionResult.resolvedArtifacts();
+                resolvedArtifacts = resolutionResult.resolvedArtifacts();
                 dependencyTree = resolutionResult.dependencyTree();
                 dependencyTreeText = resolutionResult.dependencyTreeText();
+                dependencyAnalyzeResult = resolutionResult.dependencyAnalyzeResult();
                 publish(job, ProgressEventType.PROGRESS, ProgressPhase.MAVEN_RESOLUTION,
                         "Resolved " + analysisTargets.size() + " Maven dependencies",
                         45,
@@ -178,12 +195,14 @@ public class AnalysisJobService {
             } else if (job.inputType() == InputType.PROJECT_ZIP) {
                 Path zipPath = storedFiles.getFirst();
                 publish(job, ProgressEventType.PROGRESS, ProgressPhase.EXTRACTING_PROJECT_ZIP, "Extracting project ZIP", 20, zipPath.getFileName().toString(), 0, 1);
-                Path projectRoot = projectArchiveService.extractProjectArchive(zipPath, job.workspaceDir());
+                projectRoot = projectArchiveService.extractProjectArchive(zipPath, job.workspaceDir());
                 checkCancelled(job);
 
                 publish(job, ProgressEventType.PROGRESS, ProgressPhase.DETECTING_PROJECT_STRUCTURE, "Detecting project structure", 30, projectRoot.getFileName().toString(), 0, 1);
                 ProjectStructureDetector.ProjectStructureDetection detection = projectStructureDetector.detect(projectRoot, zipPath.getFileName().toString(), job.warnings());
                 projectStructure = detection.summary();
+                compiledClassDirectories = detection.compiledClassDirectories();
+                applicationArchives = filterApplicationArchives(detection);
 
                 List<Path> combinedTargets = new ArrayList<>(detection.packagedArtifacts());
                 if (detection.rootPom() != null) {
@@ -191,8 +210,10 @@ public class AnalysisJobService {
                     MavenResolutionResult resolutionResult = mavenResolutionService.resolveDependencies(job, detection.rootPom(), "runtime", line ->
                             publish(job, ProgressEventType.LOG, ProgressPhase.MAVEN_RESOLUTION, line, null, extractCurrentItem(line), null, null));
                     combinedTargets.addAll(resolutionResult.resolvedArtifacts());
+                    resolvedArtifacts = resolutionResult.resolvedArtifacts();
                     dependencyTree = resolutionResult.dependencyTree();
                     dependencyTreeText = resolutionResult.dependencyTreeText();
+                    dependencyAnalyzeResult = resolutionResult.dependencyAnalyzeResult();
                 }
                 analysisTargets = distinctTargets(combinedTargets);
                 if (analysisTargets.isEmpty()) {
@@ -226,7 +247,7 @@ public class AnalysisJobService {
                     progressEventService.publish(job, event)));
 
             publish(job, ProgressEventType.PROGRESS, ProgressPhase.REPORTING,
-                    "Analyzing dependency conflicts, duplicate classes, and licenses",
+                    "Analyzing dependency conflicts, duplicate classes, licenses, and usage evidence",
                     96,
                     null,
                     artifacts.size(),
@@ -239,6 +260,28 @@ public class AnalysisJobService {
             List<ArtifactAnalysis> flattenedArtifacts = AnalysisSummaryFactory.flattenArtifacts(artifacts);
             List<DuplicateClassFinding> duplicateClassFindings = duplicateClassAnalysisService.analyze(flattenedArtifacts, job.warnings());
             List<LicenseFinding> licenseFindings = licenseAnalysisService.analyze(flattenedArtifacts, job.warnings());
+            DependencyUsageAnalysisService.DependencyUsageAnalysisResult usageAnalysisResult = dependencyUsageAnalysisService.analyze(
+                    job.inputType(),
+                    artifacts,
+                    resolvedArtifacts,
+                    dependencyTree,
+                    dependencyAnalyzeResult,
+                    projectRoot,
+                    projectStructure,
+                    compiledClassDirectories,
+                    applicationArchives,
+                    job.warnings()
+            );
+            List<DependencyUsageFinding> dependencyUsageFindings = usageAnalysisResult.dependencyUsageFindings();
+            DependencySlimmingAdvisorService.DependencySlimmingAdvisorResult slimmingResult = dependencySlimmingAdvisorService.analyze(
+                    dependencyUsageFindings,
+                    versionConflicts,
+                    duplicateClassFindings,
+                    dependencyTree,
+                    usageAnalysisResult.awsServiceModules()
+            );
+            List<SlimmingOpportunity> slimmingOpportunities = slimmingResult.opportunities();
+            AwsBundleAdvice awsBundleAdvice = slimmingResult.awsBundleAdvice();
 
             AnalysisResult result = new AnalysisResult(
                     job.id(),
@@ -252,7 +295,10 @@ public class AnalysisJobService {
                             versionConflicts,
                             convergenceFindings,
                             duplicateClassFindings,
-                            licenseFindings
+                            licenseFindings,
+                            dependencyUsageFindings,
+                            slimmingOpportunities,
+                            awsBundleAdvice
                     ),
                     artifacts,
                     dependencyTree,
@@ -260,6 +306,9 @@ public class AnalysisJobService {
                     convergenceFindings,
                     duplicateClassFindings,
                     licenseFindings,
+                    dependencyUsageFindings,
+                    slimmingOpportunities,
+                    awsBundleAdvice,
                     dependencyTreeText,
                     List.copyOf(job.warnings()),
                     List.copyOf(job.errors()),
@@ -430,6 +479,22 @@ public class AnalysisJobService {
             unique.putIfAbsent(key, path);
         }
         return new ArrayList<>(unique.values());
+    }
+
+    private List<Path> filterApplicationArchives(ProjectStructureDetector.ProjectStructureDetection detection) {
+        if (detection.packagedArtifacts().isEmpty()) {
+            return List.of();
+        }
+        List<Path> applicationArchives = new ArrayList<>();
+        for (Path archive : detection.packagedArtifacts()) {
+            String relative = detection.projectRoot().relativize(archive).toString().replace('\\', '/');
+            boolean underDependencyLibDir = detection.summary().dependencyLibraryDirectories().stream()
+                    .anyMatch(directory -> relative.startsWith(directory + "/") || relative.equals(directory));
+            if (!underDependencyLibDir) {
+                applicationArchives.add(archive);
+            }
+        }
+        return List.copyOf(applicationArchives);
     }
 
     private ProgressPhase progressPhaseFor(Path path, InputType inputType) {

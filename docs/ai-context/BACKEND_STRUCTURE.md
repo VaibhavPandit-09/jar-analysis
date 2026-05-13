@@ -150,6 +150,18 @@ Current package layout under `backend/src/main/java/com/jarscan`:
 - classifies common licenses into permissive, weak copyleft, strong copyleft, commercial, unknown, or multiple
 - surfaces confidence and warnings rather than pretending license evidence is always complete
 
+### `DependencyUsageAnalysisService`
+
+- combines Maven `dependency:analyze`, bytecode references, source imports fallback, resource hints, ServiceLoader/Spring metadata, and runtime heuristics
+- produces evidence-based dependency usage findings with explicit confidence, warnings, and suggested actions
+- tracks AWS service client references for the Session 9 bundle advisor
+
+### `DependencySlimmingAdvisorService`
+
+- turns usage findings, tree breadth, version conflicts, duplicate libraries, and AWS bundle signals into slimming opportunities
+- emits copyable Maven dependency snippets or exclusion snippets where practical
+- keeps guidance review-oriented rather than automatically modifying uploaded builds
+
 ### `ProgressEventService`
 
 - stores SSE emitters per job
@@ -224,6 +236,9 @@ Visible DTO and model roles:
 - `ConvergenceFinding`: dependency convergence issue with selected version and snippet
 - `DuplicateClassFinding`: duplicate class, split package, or pattern collision finding
 - `LicenseFinding`: dependency license evidence and classification
+- `DependencyUsageFinding`: evidence-based dependency usage classification with confidence and warnings
+- `SlimmingOpportunity`: removal, exclusion, replacement, or bundle-reduction opportunity
+- `AwsBundleAdvice`: focused AWS bundle replacement guidance
 - `ArtifactAnalysis`: per-artifact result including nested artifacts
 - `DependencyInfo`: dependency rows shown in UI
 - `VulnerabilityFinding`: vulnerability details
@@ -252,6 +267,12 @@ Visible DTO and model roles:
 - conflict and convergence analysis intentionally build on the Session 7 parsed dependency tree rather than shelling out to extra Maven rules
 - duplicate class scanning is bounded by `JarScanProperties.maxDuplicateClassScanJars` and additional in-service entry limits to keep scans local-first and predictable
 - license extraction is explicitly best-effort and should surface warnings or unknown categories when evidence is weak
+
+## Session 9 Usage And Slimming Notes
+
+- unused dependency detection stays evidence-based and intentionally avoids absolute language
+- Maven `dependency:analyze` is only one evidence source; bytecode references, resource/config hints, ServiceLoader/Spring metadata, and runtime heuristics can raise or lower confidence
+- slimming opportunities are advisory outputs and do not rewrite POMs automatically
 
 ## Configuration Layer
 

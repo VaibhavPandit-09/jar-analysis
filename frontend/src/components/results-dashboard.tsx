@@ -4,7 +4,7 @@ import { Download, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { DependencyTreePanel, type DependencyTreeFocusRequest, type DependencyVulnerabilitySummary } from "@/components/dependency-tree-panel";
-import { DuplicateClassesPanel, LicensesPanel, VersionConflictsPanel } from "@/components/insights-panels";
+import { DuplicateClassesPanel, LicensesPanel, SlimmingAdvisorPanel, UsageAnalysisPanel, VersionConflictsPanel } from "@/components/insights-panels";
 import {
   Accordion,
   AccordionContent,
@@ -274,7 +274,7 @@ interface ResultsDashboardProps {
 export function ResultsDashboard({ result, exportJobId, sourceLabel }: ResultsDashboardProps) {
   const [query, setQuery] = useState("");
   const [severityFilter, setSeverityFilter] = useState<Severity | "ALL">("ALL");
-  const [activeResultsTab, setActiveResultsTab] = useState<"artifacts" | "dependency-tree" | "version-conflicts" | "duplicate-classes" | "licenses">("artifacts");
+  const [activeResultsTab, setActiveResultsTab] = useState<"artifacts" | "dependency-tree" | "version-conflicts" | "duplicate-classes" | "licenses" | "usage-analysis" | "slimming-advisor">("artifacts");
   const [dependencyTreeFocus, setDependencyTreeFocus] = useState<DependencyTreeFocusRequest | null>(null);
 
   const allArtifacts = useMemo(() => flattenArtifacts(result.artifacts), [result.artifacts]);
@@ -399,13 +399,32 @@ export function ResultsDashboard({ result, exportJobId, sourceLabel }: ResultsDa
         ))}
       </section>
 
-      <Tabs value={activeResultsTab} onValueChange={(value) => setActiveResultsTab(value as "artifacts" | "dependency-tree" | "version-conflicts" | "duplicate-classes" | "licenses")}>
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        {[
+          ["Apparently unused", result.summary.apparentlyUnusedDependencyCount],
+          ["Possibly runtime-used", result.summary.possiblyRuntimeUsedDependencyCount],
+          ["Slimming opportunities", result.summary.slimmingOpportunityCount],
+          ["Estimated removable size", formatBytes(result.summary.estimatedRemovableSizeBytes)],
+          ["AWS bundle warnings", result.summary.awsBundleWarningCount],
+        ].map(([label, value]) => (
+          <Card key={String(label)}>
+            <CardContent className="p-5">
+              <div className="text-sm text-muted-foreground">{label}</div>
+              <div className="mt-2 font-display text-3xl font-semibold tracking-tight">{value}</div>
+            </CardContent>
+          </Card>
+        ))}
+      </section>
+
+      <Tabs value={activeResultsTab} onValueChange={(value) => setActiveResultsTab(value as "artifacts" | "dependency-tree" | "version-conflicts" | "duplicate-classes" | "licenses" | "usage-analysis" | "slimming-advisor")}>
         <TabsList>
           <TabsTrigger value="artifacts">Artifacts</TabsTrigger>
           <TabsTrigger value="dependency-tree">Dependency Tree</TabsTrigger>
           <TabsTrigger value="version-conflicts">Version Conflicts</TabsTrigger>
           <TabsTrigger value="duplicate-classes">Duplicate Classes</TabsTrigger>
           <TabsTrigger value="licenses">Licenses</TabsTrigger>
+          <TabsTrigger value="usage-analysis">Usage Analysis</TabsTrigger>
+          <TabsTrigger value="slimming-advisor">Slimming Advisor</TabsTrigger>
         </TabsList>
 
         <TabsContent value="artifacts">
@@ -644,6 +663,14 @@ export function ResultsDashboard({ result, exportJobId, sourceLabel }: ResultsDa
 
         <TabsContent value="licenses">
           <LicensesPanel licenses={result.licenses} />
+        </TabsContent>
+
+        <TabsContent value="usage-analysis">
+          <UsageAnalysisPanel findings={result.dependencyUsage} />
+        </TabsContent>
+
+        <TabsContent value="slimming-advisor">
+          <SlimmingAdvisorPanel opportunities={result.slimmingOpportunities} awsBundleAdvice={result.awsBundleAdvice} />
         </TabsContent>
       </Tabs>
     </motion.div>

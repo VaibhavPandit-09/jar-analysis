@@ -46,6 +46,7 @@ These routes are defined in `frontend/src/App.tsx`.
 - renders a structured dependency tree when `result.dependencyTree` is available
 - preserves raw dependency-tree text as a secondary debugging surface when present
 - renders Session 8 dependency intelligence panels from persisted `versionConflicts`, `convergenceFindings`, `duplicateClasses`, and `licenses`
+- renders Session 9 usage and slimming panels from persisted `dependencyUsage`, `slimmingOpportunities`, and `awsBundleAdvice`
 - reuses the same dashboard UI for fresh and reopened persisted scans
 - shows project structure summary when the scan came from a project ZIP
 - exposes a Fat JAR Inspector tab per artifact for fat JAR, WAR, and EAR packaging details
@@ -183,6 +184,8 @@ Current results page structure:
   - version conflicts
   - duplicate classes
   - licenses
+  - usage analysis
+  - slimming advisor
 - artifact filters for text query and severity
 - artifact accordion list
 - per-artifact tabs:
@@ -203,6 +206,8 @@ Current results page structure:
 - version conflict cards expose copyable `dependencyManagement` snippets
 - duplicate class cards highlight classpath shadowing risk and recommended action
 - license tab provides category summary cards plus a dependency license table with filters
+- usage analysis tab provides status filters, evidence panels, confidence badges, warnings, and suggested actions
+- slimming advisor tab provides optimization cards, exclusion snippets, replacement snippets, and a prominent AWS bundle card when relevant
 - export actions for JSON, Markdown, and HTML
 
 The reusable results dashboard now sits underneath both:

@@ -32,6 +32,11 @@ const baseResult: AnalysisResult = {
     strongCopyleftLicenseCount: 1,
     unknownLicenseCount: 1,
     multipleLicenseCount: 0,
+    apparentlyUnusedDependencyCount: 1,
+    possiblyRuntimeUsedDependencyCount: 1,
+    slimmingOpportunityCount: 2,
+    estimatedRemovableSizeBytes: 4_194_304,
+    awsBundleWarningCount: 1,
   },
   artifacts: [
     {
@@ -100,7 +105,7 @@ const baseResult: AnalysisResult = {
         springMetadataFiles: [],
         serviceLoaderFiles: [],
         configFiles: [],
-        duplicateClassesStatus: "Session 8 duplicate class analysis placeholder",
+        duplicateClassesStatus: "Best-effort duplicate class analysis is reported at the scan level.",
       },
     },
   ],
@@ -237,6 +242,75 @@ const baseResult: AnalysisResult = {
       warnings: ["No embedded license metadata was found."],
     },
   ],
+  dependencyUsage: [
+    {
+      groupId: "org.example",
+      artifactId: "leaf",
+      version: "1.2.3",
+      status: "DECLARED_BUT_UNUSED",
+      confidence: "HIGH",
+      evidence: ["Maven dependency:analyze reported this dependency as declared but unused."],
+      warnings: ["Removal suggestions should be reviewed and tested."],
+      suggestedAction: "Review this dependency for removal or exclusion.",
+      paths: [["com.example:demo:1.0.0", "org.example:leaf:1.2.3"]],
+      sizeBytes: 2_097_152,
+      vulnerabilitiesContributed: 1,
+    },
+    {
+      groupId: "software.amazon.awssdk",
+      artifactId: "bundle",
+      version: "2.25.0",
+      status: "POSSIBLY_RUNTIME_USED",
+      confidence: "LOW",
+      evidence: ["Runtime heuristic: Spring Boot starters and auto-configure modules can be activated without direct bytecode references."],
+      warnings: ["Java dependencies may be used through reflection or configuration."],
+      suggestedAction: "Review runtime wiring before removing.",
+      paths: [["com.example:demo:1.0.0", "software.amazon.awssdk:bundle:2.25.0"]],
+      sizeBytes: 2_097_152,
+      vulnerabilitiesContributed: 0,
+    },
+  ],
+  slimmingOpportunities: [
+    {
+      title: "Review declared but unused dependency org.example:leaf:1.2.3",
+      dependency: "org.example:leaf:1.2.3",
+      opportunityType: "UNUSED_DIRECT_DEPENDENCY",
+      sizeImpactBytes: 2_097_152,
+      transitiveDependencyCount: 3,
+      vulnerabilitiesContributed: 1,
+      usageStatus: "DECLARED_BUT_UNUSED",
+      confidence: "HIGH",
+      evidence: ["This dependency contributes 1 known vulnerability finding."],
+      suggestedReplacement: null,
+      mavenSnippet: null,
+      exclusionSnippet: "<dependency />",
+      warnings: ["Review and test before applying exclusions."],
+    },
+    {
+      title: "Replace broad AWS bundle with narrower service modules",
+      dependency: "software.amazon.awssdk:bundle:2.25.0",
+      opportunityType: "AWS_BUNDLE_REPLACEMENT",
+      sizeImpactBytes: null,
+      transitiveDependencyCount: null,
+      vulnerabilitiesContributed: null,
+      usageStatus: "POSSIBLY_RUNTIME_USED",
+      confidence: "HIGH",
+      evidence: ["A broad AWS SDK bundle was detected."],
+      suggestedReplacement: "software.amazon.awssdk:s3",
+      mavenSnippet: "<dependency />",
+      exclusionSnippet: null,
+      warnings: ["Review runtime/configuration usage and test before removing the bundle."],
+    },
+  ],
+  awsBundleAdvice: {
+    detectedArtifact: "software.amazon.awssdk:bundle:2.25.0",
+    usedServiceModules: ["s3"],
+    apparentlyUnusedServiceModules: ["dynamodb", "sqs"],
+    suggestedReplacement: "software.amazon.awssdk:s3",
+    mavenSnippet: "<dependency />",
+    warnings: ["Review runtime/configuration usage and test before removing the bundle."],
+    confidence: "HIGH",
+  },
   dependencyTreeText: "[INFO] com.example:demo:pom:1.0.0",
   warnings: [],
   errors: [],
@@ -315,5 +389,25 @@ describe("ResultsDashboard", () => {
     await userEvent.click(screen.getByRole("tab", { name: /Licenses/i }));
     expect(screen.getAllByText(/Strong copyleft/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/GNU Affero General Public License/i)).toBeInTheDocument();
+  });
+
+  it("renders usage analysis tab and confidence badges", async () => {
+    render(<ResultsDashboard result={baseResult} />);
+
+    await userEvent.click(screen.getByRole("tab", { name: /Usage Analysis/i }));
+
+    expect(screen.getByText(/Dependency usage findings are evidence-based/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/HIGH/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/DECLARED_BUT_UNUSED/i).length).toBeGreaterThan(0);
+  });
+
+  it("renders slimming advisor cards and aws advisor card", async () => {
+    render(<ResultsDashboard result={baseResult} />);
+
+    await userEvent.click(screen.getByRole("tab", { name: /Slimming Advisor/i }));
+
+    expect(screen.getByText(/AWS SDK Bundle Detected/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/software\.amazon\.awssdk:s3/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Review and test before applying exclusions/i).length).toBeGreaterThan(0);
   });
 });

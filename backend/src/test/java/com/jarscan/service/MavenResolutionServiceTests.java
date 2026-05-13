@@ -2,6 +2,7 @@ package com.jarscan.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jarscan.config.JarScanProperties;
+import com.jarscan.maven.MavenDependencyAnalyzeParser;
 import com.jarscan.maven.MavenDependencyTreeParser;
 import org.junit.jupiter.api.Test;
 
@@ -25,7 +26,8 @@ class MavenResolutionServiceTests {
                     60,
                     "runtime"
             ),
-            new MavenDependencyTreeParser(new ObjectMapper())
+            new MavenDependencyTreeParser(new ObjectMapper()),
+            new MavenDependencyAnalyzeParser()
     );
 
     @Test
@@ -69,6 +71,18 @@ class MavenResolutionServiceTests {
                 "dependency:tree",
                 "-DoutputType=text",
                 "-DoutputFile=/tmp/project/dependency-tree.txt"
+        );
+    }
+
+    @Test
+    void buildsDependencyAnalyzeCommandSafely() {
+        assertThat(mavenResolutionService.buildDependencyAnalyzeCommand(
+                Path.of("/tmp/project/pom.xml")
+        )).containsExactly(
+                "mvn",
+                "-f", "/tmp/project/pom.xml",
+                "dependency:analyze",
+                "-DskipTests"
         );
     }
 }

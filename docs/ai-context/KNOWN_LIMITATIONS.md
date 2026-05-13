@@ -28,6 +28,10 @@ The settings page performs best-effort local validation of the stored NVD API ke
 
 Future unused dependency analysis should never be treated as perfectly certain. Java applications often use dependencies indirectly through frameworks, generated code, reflection, plugin loading, or runtime configuration.
 
+## Maven dependency:analyze Is Only One Signal
+
+Session 9 uses Maven `dependency:analyze` when Maven project context is available, but JARScan does not treat that output as absolute truth. Runtime configuration, packaging behavior, and metadata-driven activation can still invalidate a naive removal decision.
+
 ## Reflection / Configuration / Runtime Loading Caveats
 
 Even when project files or bytecode are inspected, usage evidence may miss dependencies loaded through:
@@ -74,6 +78,10 @@ Permissive, weak-copyleft, strong-copyleft, commercial, unknown, and multiple cl
 
 Future project ZIP analysis may still be helpful, but if compiled classes are absent then bytecode-backed usage evidence becomes weaker and confidence should be reduced.
 
+## Resource And Metadata Hints Are Best-Effort
+
+Configuration files, `META-INF/services`, `spring.factories`, and `AutoConfiguration.imports` can lower confidence for removal suggestions, but they still do not prove every runtime path. They are clues, not guarantees.
+
 ## Project ZIPs Without POMs Have Reduced Resolution Fidelity
 
 If a project ZIP does not contain a usable root `pom.xml`, JARScan can still inspect packaged archives and detected library directories, but Maven-backed dependency resolution and dependency-tree output will be unavailable.
@@ -89,3 +97,7 @@ Current WAR/EAR/fat JAR inspection now includes duplicate-class analysis against
 ## Suggested Exclusions Require Testing
 
 Future outputs such as unused dependency suggestions, slimming advice, or AWS bundle advice should be treated as recommendations that require validation in the user’s build and runtime environment before removal.
+
+## AWS Bundle Advice Has Coverage Limits
+
+The AWS bundle advisor infers likely service usage from bytecode and metadata references that JARScan can see locally. It may miss services activated through reflection, dependency injection, wrappers, generated code, or runtime configuration, so replacement guidance must be reviewed and tested.

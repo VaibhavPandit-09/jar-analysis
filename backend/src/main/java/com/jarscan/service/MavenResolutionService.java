@@ -2,6 +2,8 @@ package com.jarscan.service;
 
 import com.jarscan.config.JarScanProperties;
 import com.jarscan.dto.DependencyTree;
+import com.jarscan.maven.MavenDependencyAnalyzeParser;
+import com.jarscan.maven.MavenDependencyAnalyzeResult;
 import com.jarscan.job.AnalysisJob;
 import com.jarscan.maven.MavenDependencyTreeParser;
 import com.jarscan.maven.MavenResolutionResult;
@@ -23,10 +25,16 @@ public class MavenResolutionService {
 
     private final JarScanProperties properties;
     private final MavenDependencyTreeParser dependencyTreeParser;
+    private final MavenDependencyAnalyzeParser dependencyAnalyzeParser;
 
-    public MavenResolutionService(JarScanProperties properties, MavenDependencyTreeParser dependencyTreeParser) {
+    public MavenResolutionService(
+            JarScanProperties properties,
+            MavenDependencyTreeParser dependencyTreeParser,
+            MavenDependencyAnalyzeParser dependencyAnalyzeParser
+    ) {
         this.properties = properties;
         this.dependencyTreeParser = dependencyTreeParser;
+        this.dependencyAnalyzeParser = dependencyAnalyzeParser;
     }
 
     public MavenResolutionResult resolveDependencies(AnalysisJob job, Path pomPath, String scope, Consumer<String> logConsumer)
@@ -37,6 +45,7 @@ public class MavenResolutionService {
         runCommand(job, workingDirectory, logConsumer, buildCopyDependenciesCommand(pomPath, dependencyDir, scope));
 
         DependencyTreeCapture dependencyTreeCapture = captureDependencyTree(job, pomPath, workingDirectory, logConsumer);
+        MavenDependencyAnalyzeResult dependencyAnalyzeResult = captureDependencyAnalyze(job, pomPath, workingDirectory, logConsumer);
 
         List<Path> artifacts = new ArrayList<>();
         try (var paths = Files.list(dependencyDir)) {
@@ -48,7 +57,12 @@ public class MavenResolutionService {
                     .forEach(artifacts::add);
         }
 
-        return new MavenResolutionResult(artifacts, dependencyTreeCapture.dependencyTree(), dependencyTreeCapture.dependencyTreeText());
+        return new MavenResolutionResult(
+                artifacts,
+                dependencyTreeCapture.dependencyTree(),
+                dependencyTreeCapture.dependencyTreeText(),
+                dependencyAnalyzeResult
+        );
     }
 
     List<String> buildCopyDependenciesCommand(Path pomPath, Path dependencyDir, String scope) {
@@ -80,6 +94,15 @@ public class MavenResolutionService {
                 "dependency:tree",
                 "-DoutputType=text",
                 "-DoutputFile=" + outputFile
+        );
+    }
+
+    List<String> buildDependencyAnalyzeCommand(Path pomPath) {
+        return List.of(
+                "mvn",
+                "-f", pomPath.toString(),
+                "dependency:analyze",
+                "-DskipTests"
         );
     }
 
@@ -116,6 +139,25 @@ public class MavenResolutionService {
         );
         String textOutput = readCommandOutput(textOutputFile, textCommand.output());
         return new DependencyTreeCapture(dependencyTreeParser.parseText(textOutput), textOutput);
+    }
+
+    private MavenDependencyAnalyzeResult captureDependencyAnalyze(
+            AnalysisJob job,
+            Path pomPath,
+            Path workingDirectory,
+            Consumer<String> logConsumer
+    ) throws IOException, InterruptedException {
+        CommandResult result = runCommandAllowFailure(
+                job,
+                workingDirectory,
+                logConsumer,
+                buildDependencyAnalyzeCommand(pomPath)
+        );
+        if (result.exitCode() != 0) {
+            logConsumer.accept("Maven dependency:analyze did not complete successfully. Usage analysis will fall back to bytecode and metadata evidence.");
+            return null;
+        }
+        return dependencyAnalyzeParser.parse(result.output());
     }
 
     private String readCommandOutput(Path outputFile, String processOutput) throws IOException {

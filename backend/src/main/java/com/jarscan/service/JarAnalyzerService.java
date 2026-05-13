@@ -512,7 +512,7 @@ public class JarAnalyzerService {
                 springMetadataFiles,
                 serviceLoaderFiles,
                 configFiles,
-                "Session 8 duplicate class analysis placeholder",
+                "Best-effort duplicate class analysis is reported at the scan level.",
                 nestedArtifacts
         );
     }

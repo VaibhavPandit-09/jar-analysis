@@ -140,6 +140,46 @@ export interface LicenseFinding {
   warnings: string[];
 }
 
+export interface DependencyUsageFinding {
+  groupId: string | null;
+  artifactId: string | null;
+  version: string | null;
+  status: string;
+  confidence: string;
+  evidence: string[];
+  warnings: string[];
+  suggestedAction: string;
+  paths: string[][];
+  sizeBytes: number | null;
+  vulnerabilitiesContributed: number | null;
+}
+
+export interface SlimmingOpportunity {
+  title: string;
+  dependency: string;
+  opportunityType: string;
+  sizeImpactBytes: number | null;
+  transitiveDependencyCount: number | null;
+  vulnerabilitiesContributed: number | null;
+  usageStatus: string;
+  confidence: string;
+  evidence: string[];
+  suggestedReplacement: string | null;
+  mavenSnippet: string | null;
+  exclusionSnippet: string | null;
+  warnings: string[];
+}
+
+export interface AwsBundleAdvice {
+  detectedArtifact: string;
+  usedServiceModules: string[];
+  apparentlyUnusedServiceModules: string[];
+  suggestedReplacement: string | null;
+  mavenSnippet: string | null;
+  warnings: string[];
+  confidence: string;
+}
+
 export interface ArtifactAnalysis {
   id: string;
   fileName: string;
@@ -239,6 +279,11 @@ export interface AnalysisSummary {
   strongCopyleftLicenseCount: number;
   unknownLicenseCount: number;
   multipleLicenseCount: number;
+  apparentlyUnusedDependencyCount: number;
+  possiblyRuntimeUsedDependencyCount: number;
+  slimmingOpportunityCount: number;
+  estimatedRemovableSizeBytes: number;
+  awsBundleWarningCount: number;
 }
 
 export interface AnalysisResult {
@@ -254,6 +299,9 @@ export interface AnalysisResult {
   convergenceFindings: ConvergenceFinding[];
   duplicateClasses: DuplicateClassFinding[];
   licenses: LicenseFinding[];
+  dependencyUsage: DependencyUsageFinding[];
+  slimmingOpportunities: SlimmingOpportunity[];
+  awsBundleAdvice: AwsBundleAdvice | null;
   dependencyTreeText: string | null;
   warnings: string[];
   errors: string[];

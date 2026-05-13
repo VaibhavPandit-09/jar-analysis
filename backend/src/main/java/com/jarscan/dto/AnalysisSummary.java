@@ -21,6 +21,11 @@ public record AnalysisSummary(
         int weakCopyleftLicenseCount,
         int strongCopyleftLicenseCount,
         int unknownLicenseCount,
-        int multipleLicenseCount
+        int multipleLicenseCount,
+        int apparentlyUnusedDependencyCount,
+        int possiblyRuntimeUsedDependencyCount,
+        int slimmingOpportunityCount,
+        long estimatedRemovableSizeBytes,
+        int awsBundleWarningCount
 ) {
 }

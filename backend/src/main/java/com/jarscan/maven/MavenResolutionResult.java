@@ -8,6 +8,7 @@ import java.util.List;
 public record MavenResolutionResult(
         List<Path> resolvedArtifacts,
         DependencyTree dependencyTree,
-        String dependencyTreeText
+        String dependencyTreeText,
+        MavenDependencyAnalyzeResult dependencyAnalyzeResult
 ) {
 }
