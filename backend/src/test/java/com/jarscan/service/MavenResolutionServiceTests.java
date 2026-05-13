@@ -19,6 +19,7 @@ class MavenResolutionServiceTests {
                     "dependency-check.sh",
                     4,
                     10_000_000,
+                    250,
                     500,
                     20_000_000,
                     60,

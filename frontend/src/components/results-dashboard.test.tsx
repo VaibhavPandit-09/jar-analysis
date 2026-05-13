@@ -23,6 +23,15 @@ const baseResult: AnalysisResult = {
     unknown: 0,
     highestCvss: 7.5,
     requiredJavaVersion: "Java 17",
+    versionConflictCount: 1,
+    convergenceIssueCount: 1,
+    duplicateClassCount: 1,
+    licenseWarningCount: 2,
+    permissiveLicenseCount: 0,
+    weakCopyleftLicenseCount: 0,
+    strongCopyleftLicenseCount: 1,
+    unknownLicenseCount: 1,
+    multipleLicenseCount: 0,
   },
   artifacts: [
     {
@@ -163,6 +172,71 @@ const baseResult: AnalysisResult = {
       },
     ],
   },
+  versionConflicts: [
+    {
+      groupId: "org.example",
+      artifactId: "leaf",
+      resolvedVersion: "1.2.3",
+      requestedVersions: ["1.2.3", "0.9.0"],
+      pathsByVersion: {
+        "1.2.3": [["com.example:demo:1.0.0", "org.example:parent:2.0.0", "org.example:leaf:1.2.3"]],
+        "0.9.0": [["com.example:demo:1.0.0", "org.example:legacy:1.0.0", "org.example:leaf:0.9.0"]],
+      },
+      conflictType: "NEAREST_WINS_CONFLICT",
+      riskLevel: "HIGH",
+      recommendation: "Align transitive versions to a single approved release.",
+      dependencyManagementSnippet: "<dependencyManagement />",
+    },
+  ],
+  convergenceFindings: [
+    {
+      groupId: "org.example",
+      artifactId: "leaf",
+      versionsFound: ["1.2.3", "0.9.0"],
+      pathsByVersion: {
+        "1.2.3": [["com.example:demo:1.0.0", "org.example:parent:2.0.0", "org.example:leaf:1.2.3"]],
+        "0.9.0": [["com.example:demo:1.0.0", "org.example:legacy:1.0.0", "org.example:leaf:0.9.0"]],
+      },
+      selectedVersion: "1.2.3",
+      recommendation: "Converge on one version.",
+      snippet: "<dependencyManagement />",
+    },
+  ],
+  duplicateClasses: [
+    {
+      findingType: "EXACT_DUPLICATE_CLASS",
+      symbol: "com.example.Foo.class",
+      packageName: "com.example",
+      artifacts: ["a.jar", "b.jar"],
+      severity: "MEDIUM",
+      recommendation: "Exclude one provider.",
+      shadowingWarning: "Classpath shadowing warning.",
+    },
+  ],
+  licenses: [
+    {
+      groupId: "org.example",
+      artifactId: "leaf",
+      version: "1.2.3",
+      licenseName: "GNU Affero General Public License",
+      licenseUrl: null,
+      source: "EMBEDDED_POM",
+      confidence: "HIGH",
+      category: "strong copyleft",
+      warnings: ["Strong copyleft license detected."],
+    },
+    {
+      groupId: "com.example",
+      artifactId: "demo",
+      version: "1.0.0",
+      licenseName: "Unknown",
+      licenseUrl: null,
+      source: "NONE",
+      confidence: "LOW",
+      category: "unknown",
+      warnings: ["No embedded license metadata was found."],
+    },
+  ],
   dependencyTreeText: "[INFO] com.example:demo:pom:1.0.0",
   warnings: [],
   errors: [],
@@ -221,5 +295,25 @@ describe("ResultsDashboard", () => {
 
     expect(screen.getByText(/Why is this dependency here\?/i)).toBeInTheDocument();
     expect(screen.getAllByText(/org\.example:leaf:1\.2\.3/i).length).toBeGreaterThan(0);
+  });
+
+  it("renders version conflict tab", async () => {
+    render(<ResultsDashboard result={baseResult} />);
+
+    await userEvent.click(screen.getByRole("tab", { name: /Version Conflicts/i }));
+
+    expect(screen.getAllByText(/dependencyManagement snippet/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/NEAREST_WINS_CONFLICT/i)).toBeInTheDocument();
+  });
+
+  it("renders duplicate classes and licenses tabs", async () => {
+    render(<ResultsDashboard result={baseResult} />);
+
+    await userEvent.click(screen.getByRole("tab", { name: /Duplicate Classes/i }));
+    expect(screen.getAllByText(/Classpath shadowing warning/i).length).toBeGreaterThan(0);
+
+    await userEvent.click(screen.getByRole("tab", { name: /Licenses/i }));
+    expect(screen.getAllByText(/Strong copyleft/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/GNU Affero General Public License/i)).toBeInTheDocument();
   });
 });

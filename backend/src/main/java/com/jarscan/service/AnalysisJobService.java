@@ -4,9 +4,13 @@ import com.jarscan.dto.AnalysisJobResponse;
 import com.jarscan.dto.AnalysisJobStatusResponse;
 import com.jarscan.dto.AnalysisResult;
 import com.jarscan.dto.ArtifactAnalysis;
+import com.jarscan.dto.ConvergenceFinding;
 import com.jarscan.dto.DependencyTree;
+import com.jarscan.dto.DuplicateClassFinding;
+import com.jarscan.dto.LicenseFinding;
 import com.jarscan.dto.ProgressEvent;
 import com.jarscan.dto.ProjectStructureSummary;
+import com.jarscan.dto.VersionConflictFinding;
 import com.jarscan.job.AnalysisJob;
 import com.jarscan.job.JobCancelledException;
 import com.jarscan.maven.MavenResolutionResult;
@@ -49,6 +53,9 @@ public class AnalysisJobService {
     private final ScanHistoryService scanHistoryService;
     private final ProjectArchiveService projectArchiveService;
     private final ProjectStructureDetector projectStructureDetector;
+    private final DependencyConflictAnalysisService dependencyConflictAnalysisService;
+    private final DuplicateClassAnalysisService duplicateClassAnalysisService;
+    private final LicenseAnalysisService licenseAnalysisService;
 
     public AnalysisJobService(
             ExecutorService analysisExecutor,
@@ -58,7 +65,10 @@ public class AnalysisJobService {
             VulnerabilityScannerService vulnerabilityScannerService,
             ScanHistoryService scanHistoryService,
             ProjectArchiveService projectArchiveService,
-            ProjectStructureDetector projectStructureDetector
+            ProjectStructureDetector projectStructureDetector,
+            DependencyConflictAnalysisService dependencyConflictAnalysisService,
+            DuplicateClassAnalysisService duplicateClassAnalysisService,
+            LicenseAnalysisService licenseAnalysisService
     ) {
         this.analysisExecutor = analysisExecutor;
         this.progressEventService = progressEventService;
@@ -68,6 +78,9 @@ public class AnalysisJobService {
         this.scanHistoryService = scanHistoryService;
         this.projectArchiveService = projectArchiveService;
         this.projectStructureDetector = projectStructureDetector;
+        this.dependencyConflictAnalysisService = dependencyConflictAnalysisService;
+        this.duplicateClassAnalysisService = duplicateClassAnalysisService;
+        this.licenseAnalysisService = licenseAnalysisService;
     }
 
     public AnalysisJobResponse createJob(List<MultipartFile> files) {
@@ -212,15 +225,41 @@ public class AnalysisJobService {
             artifacts = new ArrayList<>(vulnerabilityScannerService.scanArtifacts(job, artifacts, event ->
                     progressEventService.publish(job, event)));
 
+            publish(job, ProgressEventType.PROGRESS, ProgressPhase.REPORTING,
+                    "Analyzing dependency conflicts, duplicate classes, and licenses",
+                    96,
+                    null,
+                    artifacts.size(),
+                    artifacts.size());
+
+            DependencyConflictAnalysisService.DependencyConflictAnalysisResult dependencyInsights =
+                    dependencyConflictAnalysisService.analyze(dependencyTree);
+            List<VersionConflictFinding> versionConflicts = dependencyInsights.versionConflicts();
+            List<ConvergenceFinding> convergenceFindings = dependencyInsights.convergenceFindings();
+            List<ArtifactAnalysis> flattenedArtifacts = AnalysisSummaryFactory.flattenArtifacts(artifacts);
+            List<DuplicateClassFinding> duplicateClassFindings = duplicateClassAnalysisService.analyze(flattenedArtifacts, job.warnings());
+            List<LicenseFinding> licenseFindings = licenseAnalysisService.analyze(flattenedArtifacts, job.warnings());
+
             AnalysisResult result = new AnalysisResult(
                     job.id(),
                     JobStatus.COMPLETED,
                     job.inputType(),
                     job.startedAt(),
                     Instant.now(),
-                    AnalysisSummaryFactory.create(job.inputType(), artifacts),
+                    AnalysisSummaryFactory.create(
+                            job.inputType(),
+                            artifacts,
+                            versionConflicts,
+                            convergenceFindings,
+                            duplicateClassFindings,
+                            licenseFindings
+                    ),
                     artifacts,
                     dependencyTree,
+                    versionConflicts,
+                    convergenceFindings,
+                    duplicateClassFindings,
+                    licenseFindings,
                     dependencyTreeText,
                     List.copyOf(job.warnings()),
                     List.copyOf(job.errors()),

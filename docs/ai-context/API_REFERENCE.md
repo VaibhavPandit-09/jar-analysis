@@ -32,6 +32,18 @@ This file documents currently visible backend endpoints and planned v2 expansion
     - `dependencyTree`
       - structured root/child nodes
       - node fields include `id`, `groupId`, `artifactId`, `type`, `classifier`, `version`, `scope`, `depth`, `parentId`, `children`, `direct`, `transitive`, `omitted`, `omittedReason`, `conflict`, `rawLine`, and `pathFromRoot`
+    - `versionConflicts`
+      - list of `VersionConflictFinding`
+      - fields include `groupId`, `artifactId`, `resolvedVersion`, `requestedVersions`, `pathsByVersion`, `conflictType`, `riskLevel`, `recommendation`, and `dependencyManagementSnippet`
+    - `convergenceFindings`
+      - list of `ConvergenceFinding`
+      - fields include `groupId`, `artifactId`, `versionsFound`, `pathsByVersion`, `selectedVersion`, `recommendation`, and `snippet`
+    - `duplicateClasses`
+      - list of `DuplicateClassFinding`
+      - fields include `findingType`, `symbol`, `packageName`, `artifacts`, `severity`, `recommendation`, and `shadowingWarning`
+    - `licenses`
+      - list of `LicenseFinding`
+      - fields include `groupId`, `artifactId`, `version`, `licenseName`, `licenseUrl`, `source`, `confidence`, `category`, and `warnings`
     - `dependencyTreeText`
       - raw Maven tree text when text output was used or retained for debugging
 
@@ -147,6 +159,10 @@ The following response DTOs are visible or directly implied by controller/servic
 - `AnalysisResult`
 - `DependencyTree`
 - `DependencyTreeNode`
+- `VersionConflictFinding`
+- `ConvergenceFinding`
+- `DuplicateClassFinding`
+- `LicenseFinding`
 - `NvdSettingsStatusResponse`
 - `NvdSettingsTestResponse`
 - `ProgressEvent`
@@ -168,6 +184,15 @@ Implemented in result payloads:
 
 - Maven dependency tree parsing with JSON-first capture and text fallback
 - `pathFromRoot` per dependency node so the frontend can explain why a dependency is present without an extra API call
+
+## Session 8 Dependency Intelligence Status
+
+Implemented in result payloads:
+
+- version conflict analysis based on the parsed Maven dependency tree
+- dependency convergence findings with suggested `dependencyManagement` snippets
+- duplicate class and split-package findings across analyzed dependency archives
+- best-effort license extraction and classification from embedded POM metadata, manifest fields, and license files
 
 ## Planned v2 Settings Endpoints
 

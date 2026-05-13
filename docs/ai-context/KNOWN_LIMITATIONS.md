@@ -50,6 +50,26 @@ If an uploaded archive lacks embedded Maven metadata or related POM context, JAR
 
 The Session 7 dependency tree UI only appears when Maven `dependency:tree` output could be captured and parsed from an uploaded `pom.xml` or a project ZIP with a usable root `pom.xml`.
 
+## Version Conflict And Convergence Findings Depend On Tree Fidelity
+
+Session 8 conflict and convergence analysis are only as precise as the parsed Maven tree. When Maven output includes omitted nodes, managed-version hints, or conflict annotations, JARScan can explain more. When that context is missing, findings remain best-effort.
+
+## Duplicate Class Detection Is Bounded
+
+Duplicate class analysis intentionally stops after configurable archive-count and internal entry-count limits so very large scans do not become excessively expensive. A clean run means "no duplicates detected within the scan budget," not an absolute proof for arbitrarily large inputs.
+
+## Duplicate Class Detection Is Archive-Centric
+
+Duplicate-class and split-package findings are derived from the analyzed dependency archive set. They do not reconstruct the exact runtime classpath order for every application server, launcher, shading strategy, or container environment.
+
+## License Analysis Is Best-Effort
+
+License findings rely on evidence such as embedded Maven `pom.xml`, manifest metadata, and `LICENSE`/`NOTICE` files. Some artifacts provide incomplete, conflicting, or missing license data, so unknown and multiple-license results should be reviewed manually.
+
+## License Categories Are Review Aids, Not Legal Advice
+
+Permissive, weak-copyleft, strong-copyleft, commercial, unknown, and multiple classifications are intended to help triage dependency review. They are not legal advice and do not replace a proper license compliance process.
+
 ## Project ZIPs Without Compiled Classes Are Less Reliable For Usage Analysis
 
 Future project ZIP analysis may still be helpful, but if compiled classes are absent then bytecode-backed usage evidence becomes weaker and confidence should be reduced.
@@ -62,9 +82,9 @@ If a project ZIP does not contain a usable root `pom.xml`, JARScan can still ins
 
 Project ZIP extraction is intentionally bounded by file-count and extracted-size limits. Large monorepos, generated directories, or oversized vendor bundles may be rejected unless limits are raised intentionally.
 
-## WAR/EAR And Fat JAR Inspection Is Structural
+## WAR/EAR And Fat JAR Inspection Still Has Runtime Blind Spots
 
-Current WAR/EAR/fat JAR inspection focuses on packaged structure, embedded libraries, metadata, and bytecode versions. It does not yet perform duplicate-class detection, dependency-path explanation, or usage analysis inside those layouts.
+Current WAR/EAR/fat JAR inspection now includes duplicate-class analysis against the analyzed archive set, but it still focuses on packaged structure, embedded libraries, metadata, and bytecode versions. It does not fully model runtime container ordering, dynamic class loading, or usage analysis inside those layouts.
 
 ## Suggested Exclusions Require Testing
 

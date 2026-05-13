@@ -4,6 +4,7 @@ import { Download, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { DependencyTreePanel, type DependencyTreeFocusRequest, type DependencyVulnerabilitySummary } from "@/components/dependency-tree-panel";
+import { DuplicateClassesPanel, LicensesPanel, VersionConflictsPanel } from "@/components/insights-panels";
 import {
   Accordion,
   AccordionContent,
@@ -273,7 +274,7 @@ interface ResultsDashboardProps {
 export function ResultsDashboard({ result, exportJobId, sourceLabel }: ResultsDashboardProps) {
   const [query, setQuery] = useState("");
   const [severityFilter, setSeverityFilter] = useState<Severity | "ALL">("ALL");
-  const [activeResultsTab, setActiveResultsTab] = useState<"artifacts" | "dependency-tree">("artifacts");
+  const [activeResultsTab, setActiveResultsTab] = useState<"artifacts" | "dependency-tree" | "version-conflicts" | "duplicate-classes" | "licenses">("artifacts");
   const [dependencyTreeFocus, setDependencyTreeFocus] = useState<DependencyTreeFocusRequest | null>(null);
 
   const allArtifacts = useMemo(() => flattenArtifacts(result.artifacts), [result.artifacts]);
@@ -364,6 +365,24 @@ export function ResultsDashboard({ result, exportJobId, sourceLabel }: ResultsDa
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
         {[
+          ["Version conflicts", result.summary.versionConflictCount],
+          ["Convergence issues", result.summary.convergenceIssueCount],
+          ["Duplicate class findings", result.summary.duplicateClassCount],
+          ["License warnings", result.summary.licenseWarningCount],
+          ["Unknown licenses", result.summary.unknownLicenseCount],
+          ["Strong copyleft", result.summary.strongCopyleftLicenseCount],
+        ].map(([label, value]) => (
+          <Card key={String(label)}>
+            <CardContent className="p-5">
+              <div className="text-sm text-muted-foreground">{label}</div>
+              <div className="mt-2 font-display text-3xl font-semibold tracking-tight">{value}</div>
+            </CardContent>
+          </Card>
+        ))}
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+        {[
           ["Critical", result.summary.critical, "critical"],
           ["High", result.summary.high, "high"],
           ["Medium", result.summary.medium, "medium"],
@@ -380,10 +399,13 @@ export function ResultsDashboard({ result, exportJobId, sourceLabel }: ResultsDa
         ))}
       </section>
 
-      <Tabs value={activeResultsTab} onValueChange={(value) => setActiveResultsTab(value as "artifacts" | "dependency-tree")}>
+      <Tabs value={activeResultsTab} onValueChange={(value) => setActiveResultsTab(value as "artifacts" | "dependency-tree" | "version-conflicts" | "duplicate-classes" | "licenses")}>
         <TabsList>
           <TabsTrigger value="artifacts">Artifacts</TabsTrigger>
           <TabsTrigger value="dependency-tree">Dependency Tree</TabsTrigger>
+          <TabsTrigger value="version-conflicts">Version Conflicts</TabsTrigger>
+          <TabsTrigger value="duplicate-classes">Duplicate Classes</TabsTrigger>
+          <TabsTrigger value="licenses">Licenses</TabsTrigger>
         </TabsList>
 
         <TabsContent value="artifacts">
@@ -596,6 +618,32 @@ export function ResultsDashboard({ result, exportJobId, sourceLabel }: ResultsDa
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+
+        <TabsContent value="version-conflicts">
+          {result.dependencyTree && result.dependencyTree.roots.length > 0 ? (
+            <VersionConflictsPanel
+              versionConflicts={result.versionConflicts}
+              convergenceFindings={result.convergenceFindings}
+            />
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle>Version conflict analysis unavailable</CardTitle>
+                <CardDescription>
+                  Version conflict and convergence analysis depend on the parsed Maven dependency tree from an uploaded `pom.xml` or a project ZIP with a usable root `pom.xml`.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="duplicate-classes">
+          <DuplicateClassesPanel findings={result.duplicateClasses} />
+        </TabsContent>
+
+        <TabsContent value="licenses">
+          <LicensesPanel licenses={result.licenses} />
         </TabsContent>
       </Tabs>
     </motion.div>

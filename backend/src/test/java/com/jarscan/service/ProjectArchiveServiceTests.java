@@ -22,6 +22,7 @@ class ProjectArchiveServiceTests {
             "dependency-check.sh",
             4,
             10_000_000,
+            250,
             3,
             1_024,
             60,

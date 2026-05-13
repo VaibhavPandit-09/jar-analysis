@@ -40,10 +40,12 @@ These routes are defined in `frontend/src/App.tsx`.
 - renders summary cards
 - renders severity rollups
 - shows top-level results tabs for artifacts and dependency tree views
+- now also shows version conflicts, duplicate classes, and license review tabs
 - shows artifact accordions with tabs
 - supports export links
 - renders a structured dependency tree when `result.dependencyTree` is available
 - preserves raw dependency-tree text as a secondary debugging surface when present
+- renders Session 8 dependency intelligence panels from persisted `versionConflicts`, `convergenceFindings`, `duplicateClasses`, and `licenses`
 - reuses the same dashboard UI for fresh and reopened persisted scans
 - shows project structure summary when the scan came from a project ZIP
 - exposes a Fat JAR Inspector tab per artifact for fat JAR, WAR, and EAR packaging details
@@ -178,6 +180,9 @@ Current results page structure:
 - top-level results tabs:
   - artifacts
   - dependency tree
+  - version conflicts
+  - duplicate classes
+  - licenses
 - artifact filters for text query and severity
 - artifact accordion list
 - per-artifact tabs:
@@ -195,6 +200,9 @@ Current results page structure:
   - selected-node side panel
   - why-is-this-dependency-here path panel
 - vulnerability tables can jump into the dependency tree tab through `Show path`
+- version conflict cards expose copyable `dependencyManagement` snippets
+- duplicate class cards highlight classpath shadowing risk and recommended action
+- license tab provides category summary cards plus a dependency license table with filters
 - export actions for JSON, Markdown, and HTML
 
 The reusable results dashboard now sits underneath both:

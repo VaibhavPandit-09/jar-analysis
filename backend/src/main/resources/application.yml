@@ -34,6 +34,7 @@ jarscan:
   dependency-check-command: ${JARSCAN_DEPENDENCY_CHECK_COMMAND:dependency-check.sh}
   max-nested-jar-depth: ${JARSCAN_MAX_NESTED_JAR_DEPTH:4}
   max-extracted-archive-size-bytes: ${JARSCAN_MAX_EXTRACTED_ARCHIVE_SIZE_BYTES:268435456}
+  max-duplicate-class-scan-jars: ${JARSCAN_MAX_DUPLICATE_CLASS_SCAN_JARS:250}
   project-zip-max-files: ${JARSCAN_PROJECT_ZIP_MAX_FILES:20000}
   project-zip-max-extracted-size-bytes: ${JARSCAN_PROJECT_ZIP_MAX_EXTRACTED_SIZE_BYTES:536870912}
   maven-timeout-seconds: ${JARSCAN_MAVEN_TIMEOUT_SECONDS:600}

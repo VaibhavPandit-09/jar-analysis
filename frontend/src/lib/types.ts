@@ -96,6 +96,50 @@ export interface DependencyTree {
   roots: DependencyTreeNode[];
 }
 
+export interface VersionConflictFinding {
+  groupId: string | null;
+  artifactId: string | null;
+  resolvedVersion: string | null;
+  requestedVersions: string[];
+  pathsByVersion: Record<string, string[][]>;
+  conflictType: string;
+  riskLevel: string;
+  recommendation: string;
+  dependencyManagementSnippet: string | null;
+}
+
+export interface ConvergenceFinding {
+  groupId: string | null;
+  artifactId: string | null;
+  versionsFound: string[];
+  pathsByVersion: Record<string, string[][]>;
+  selectedVersion: string | null;
+  recommendation: string;
+  snippet: string | null;
+}
+
+export interface DuplicateClassFinding {
+  findingType: string;
+  symbol: string;
+  packageName: string | null;
+  artifacts: string[];
+  severity: string;
+  recommendation: string;
+  shadowingWarning: string;
+}
+
+export interface LicenseFinding {
+  groupId: string | null;
+  artifactId: string | null;
+  version: string | null;
+  licenseName: string;
+  licenseUrl: string | null;
+  source: string;
+  confidence: string;
+  category: string;
+  warnings: string[];
+}
+
 export interface ArtifactAnalysis {
   id: string;
   fileName: string;
@@ -186,6 +230,15 @@ export interface AnalysisSummary {
   unknown: number;
   highestCvss: number | null;
   requiredJavaVersion: string;
+  versionConflictCount: number;
+  convergenceIssueCount: number;
+  duplicateClassCount: number;
+  licenseWarningCount: number;
+  permissiveLicenseCount: number;
+  weakCopyleftLicenseCount: number;
+  strongCopyleftLicenseCount: number;
+  unknownLicenseCount: number;
+  multipleLicenseCount: number;
 }
 
 export interface AnalysisResult {
@@ -197,6 +250,10 @@ export interface AnalysisResult {
   summary: AnalysisSummary;
   artifacts: ArtifactAnalysis[];
   dependencyTree: DependencyTree | null;
+  versionConflicts: VersionConflictFinding[];
+  convergenceFindings: ConvergenceFinding[];
+  duplicateClasses: DuplicateClassFinding[];
+  licenses: LicenseFinding[];
   dependencyTreeText: string | null;
   warnings: string[];
   errors: string[];
@@ -361,35 +418,29 @@ export interface VulnerabilityChangeItem {
   newSeverity: Severity | null;
   oldCvss: number | null;
   newCvss: number | null;
-  dependencyKey: string;
+  dependencyKey: string | null;
   dependencyGroupId: string | null;
   dependencyArtifactId: string | null;
   oldDependencyVersion: string | null;
   newDependencyVersion: string | null;
 }
 
-export interface DependencyComparisonSection {
-  addedCount: number;
-  removedCount: number;
-  updatedCount: number;
-  unchangedCount: number;
-  changes: DependencyChangeItem[];
-}
-
-export interface VulnerabilityComparisonSection {
-  newCount: number;
-  fixedCount: number;
-  changedCount: number;
-  unchangedCount: number;
-  changes: VulnerabilityChangeItem[];
+export interface ChangeBucket<T> {
+  addedCount?: number;
+  removedCount?: number;
+  updatedCount?: number;
+  unchangedCount?: number;
+  newCount?: number;
+  fixedCount?: number;
+  changedCount?: number;
+  changes: T[];
 }
 
 export interface ScanComparisonResponse {
   baseline: StoredScanSummary;
   target: StoredScanSummary;
   summaryDiff: ScanComparisonSummaryDiff;
-  dependencyChanges: DependencyComparisonSection;
-  vulnerabilityChanges: VulnerabilityComparisonSection;
+  dependencyChanges: ChangeBucket<DependencyChangeItem>;
+  vulnerabilityChanges: ChangeBucket<VulnerabilityChangeItem>;
   warnings: string[];
-  errors: string[];
 }

@@ -12,6 +12,15 @@ public record AnalysisSummary(
         int info,
         int unknown,
         Double highestCvss,
-        String requiredJavaVersion
+        String requiredJavaVersion,
+        int versionConflictCount,
+        int convergenceIssueCount,
+        int duplicateClassCount,
+        int licenseWarningCount,
+        int permissiveLicenseCount,
+        int weakCopyleftLicenseCount,
+        int strongCopyleftLicenseCount,
+        int unknownLicenseCount,
+        int multipleLicenseCount
 ) {
 }

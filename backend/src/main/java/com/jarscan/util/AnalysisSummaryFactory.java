@@ -2,6 +2,10 @@ package com.jarscan.util;
 
 import com.jarscan.dto.AnalysisSummary;
 import com.jarscan.dto.ArtifactAnalysis;
+import com.jarscan.dto.ConvergenceFinding;
+import com.jarscan.dto.DuplicateClassFinding;
+import com.jarscan.dto.LicenseFinding;
+import com.jarscan.dto.VersionConflictFinding;
 import com.jarscan.dto.VulnerabilityFinding;
 import com.jarscan.model.InputType;
 import com.jarscan.model.Severity;
@@ -14,7 +18,14 @@ public final class AnalysisSummaryFactory {
     private AnalysisSummaryFactory() {
     }
 
-    public static AnalysisSummary create(InputType inputType, List<ArtifactAnalysis> artifacts) {
+    public static AnalysisSummary create(
+            InputType inputType,
+            List<ArtifactAnalysis> artifacts,
+            List<VersionConflictFinding> versionConflicts,
+            List<ConvergenceFinding> convergenceFindings,
+            List<DuplicateClassFinding> duplicateClassFindings,
+            List<LicenseFinding> licenses
+    ) {
         List<ArtifactAnalysis> flattenedArtifacts = flattenArtifacts(artifacts);
         List<VulnerabilityFinding> findings = flattenedArtifacts.stream()
                 .flatMap(artifact -> artifact.vulnerabilities().stream())
@@ -46,6 +57,13 @@ public final class AnalysisSummaryFactory {
                 ? flattenedArtifacts.size()
                 : Math.max(0, flattenedArtifacts.size() - artifacts.size());
 
+        int permissiveLicenses = countLicenses(licenses, "permissive");
+        int weakCopyleftLicenses = countLicenses(licenses, "weak copyleft");
+        int strongCopyleftLicenses = countLicenses(licenses, "strong copyleft");
+        int unknownLicenses = countLicenses(licenses, "unknown");
+        int multipleLicenses = countLicenses(licenses, "multiple");
+        int licenseWarnings = (int) licenses.stream().filter(license -> !license.warnings().isEmpty()).count();
+
         return new AnalysisSummary(
                 flattenedArtifacts.size(),
                 totalDependencies,
@@ -58,7 +76,16 @@ public final class AnalysisSummaryFactory {
                 info,
                 unknown,
                 highestCvss,
-                JavaVersionMapper.describe(maxMajor)
+                JavaVersionMapper.describe(maxMajor),
+                versionConflicts.size(),
+                convergenceFindings.size(),
+                duplicateClassFindings.size(),
+                licenseWarnings,
+                permissiveLicenses,
+                weakCopyleftLicenses,
+                strongCopyleftLicenses,
+                unknownLicenses,
+                multipleLicenses
         );
     }
 
@@ -73,5 +100,9 @@ public final class AnalysisSummaryFactory {
 
     private static int countSeverity(List<VulnerabilityFinding> findings, Severity severity) {
         return (int) findings.stream().filter(finding -> finding.severity() == severity).count();
+    }
+
+    private static int countLicenses(List<LicenseFinding> licenses, String category) {
+        return (int) licenses.stream().filter(license -> category.equals(license.category())).count();
     }
 }

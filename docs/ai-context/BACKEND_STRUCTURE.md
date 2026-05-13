@@ -132,6 +132,24 @@ Current package layout under `backend/src/main/java/com/jarscan`:
 - resolves one or more root-to-node paths for a dependency key (`groupId:artifactId`)
 - supports path-to-dependency UI and future backend drill-down use cases
 
+### `DependencyConflictAnalysisService`
+
+- analyzes the parsed Maven dependency tree for multi-version coordinates
+- derives version conflict findings, convergence findings, selected versions, requested versions, and introducing paths
+- emits copyable `dependencyManagement` snippets without modifying uploaded POMs
+
+### `DuplicateClassAnalysisService`
+
+- scans analyzed dependency archives for duplicate `.class` entries
+- detects split packages and selected high-signal collision patterns such as multiple SLF4J bindings
+- enforces configurable scan limits to avoid excessive work on very large archive sets
+
+### `LicenseAnalysisService`
+
+- extracts best-effort dependency license evidence from embedded Maven `pom.xml`, manifest fields, and license/notice files
+- classifies common licenses into permissive, weak copyleft, strong copyleft, commercial, unknown, or multiple
+- surfaces confidence and warnings rather than pretending license evidence is always complete
+
 ### `ProgressEventService`
 
 - stores SSE emitters per job
@@ -202,6 +220,10 @@ Visible DTO and model roles:
 - `DependencyTree`: structured Maven dependency tree payload
 - `DependencyTreeNode`: individual dependency tree node with path metadata
 - `AnalysisSummary`: top-level totals and severity summary
+- `VersionConflictFinding`: per-coordinate version conflict finding
+- `ConvergenceFinding`: dependency convergence issue with selected version and snippet
+- `DuplicateClassFinding`: duplicate class, split package, or pattern collision finding
+- `LicenseFinding`: dependency license evidence and classification
 - `ArtifactAnalysis`: per-artifact result including nested artifacts
 - `DependencyInfo`: dependency rows shown in UI
 - `VulnerabilityFinding`: vulnerability details
@@ -225,6 +247,12 @@ Visible DTO and model roles:
 - Parsed dependency trees are persisted inside `result_json`, so reopened scans can render the same dependency-path UI without rerunning Maven.
 - `pathFromRoot` is stored per node to keep the path-to-dependency experience simple and deterministic in the frontend.
 
+## Session 8 Dependency Intelligence Notes
+
+- conflict and convergence analysis intentionally build on the Session 7 parsed dependency tree rather than shelling out to extra Maven rules
+- duplicate class scanning is bounded by `JarScanProperties.maxDuplicateClassScanJars` and additional in-service entry limits to keep scans local-first and predictable
+- license extraction is explicitly best-effort and should surface warnings or unknown categories when evidence is weak
+
 ## Configuration Layer
 
 Visible configuration:
@@ -244,6 +272,7 @@ Important backend configuration concerns already represented:
 - extraction budget
 - Maven timeout
 - default Maven dependency scope
+- duplicate-class scan jar limit
 - multipart upload size
 - local secret file path derived from `dataDir`
 

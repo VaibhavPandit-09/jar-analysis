@@ -8,6 +8,9 @@ JARScan is a personal web-based Java artifact analyzer for `.jar`, `.war`, `.ear
 - Single `pom.xml` upload with Maven transitive dependency resolution
 - Single project ZIP upload with safe extraction and best-effort structure detection
 - Parsed Maven dependency tree with path-to-dependency drill-down
+- Version conflict and dependency convergence analysis with generated `dependencyManagement` snippets
+- Duplicate class and split-package detection for scanned dependency archives
+- Best-effort dependency license analysis with category warnings
 - Java bytecode version inspection from class headers
 - Manifest parsing and Maven coordinate extraction
 - Nested/fat JAR detection for common layouts such as `BOOT-INF/lib/`
@@ -19,6 +22,7 @@ JARScan is a personal web-based Java artifact analyzer for `.jar`, `.war`, `.ear
 - Persistent scan history with reopen, notes/tags, and delete actions
 - Scan comparison between persisted scans with dependency and vulnerability deltas
 - Dependency Tree results tab with expand/collapse, search, scope filters, and conflict highlighting
+- Version Conflicts, Duplicate Classes, and Licenses results tabs
 - Light, dark, and system theme support
 
 ## AI Maintainer Context
@@ -68,7 +72,8 @@ Open [http://localhost:8080](http://localhost:8080).
 3. `dependency:copy-dependencies` resolves and downloads transitive dependencies into a job-local directory.
 4. `dependency:tree` output is captured and parsed into a structured dependency tree when possible.
 5. Parsed dependency nodes are attached to the result JSON for visualization and path-to-dependency exploration.
-6. Each resolved artifact is analyzed like a direct archive upload.
+6. Version conflicts, convergence issues, duplicate classes, and dependency licenses are derived from the resolved graph and analyzed artifacts on a best-effort basis.
+7. Each resolved artifact is analyzed like a direct archive upload.
 
 ### Project ZIP upload
 
@@ -77,7 +82,8 @@ Open [http://localhost:8080](http://localhost:8080).
 3. JARScan detects `pom.xml` files, packaged archives, compiled class directories, dependency library directories, Spring metadata, and ServiceLoader metadata.
 4. If a best-effort root POM is detected, Maven dependency resolution runs from that POM.
 5. Parsed dependency tree data is attached when Maven tree output is available.
-6. Packaged JAR/WAR/EAR artifacts and detected dependency archives are analyzed like normal archives.
+6. Conflict, convergence, duplicate-class, and license analysis run against the detected dependency set when enough evidence exists.
+7. Packaged JAR/WAR/EAR artifacts and detected dependency archives are analyzed like normal archives.
 
 ## Volumes And Persistence
 
@@ -144,6 +150,7 @@ Environment variables supported by the backend:
 - `JARSCAN_MAX_EXTRACTED_ARCHIVE_SIZE_BYTES`
 - `JARSCAN_PROJECT_ZIP_MAX_FILES`
 - `JARSCAN_PROJECT_ZIP_MAX_EXTRACTED_SIZE_BYTES`
+- `JARSCAN_MAX_DUPLICATE_CLASS_SCAN_JARS`
 
 Most users should configure the NVD API key through the UI rather than an environment variable.
 
@@ -201,4 +208,7 @@ The project is built and run on Eclipse Temurin Java 25 through the official Mav
 - Running jobs and SSE event streams are still in-memory while the job is active, even though completed scan results now persist in SQLite history.
 - Dependency tables on individual artifact cards focus on embedded nested archives rather than reconstructing a full Maven graph per artifact.
 - Full dependency tree visualization requires Maven tree output from an uploaded `pom.xml` or a project ZIP with a usable root `pom.xml`.
+- Version conflict and convergence findings are strongest when Maven tree output includes omitted/conflict context. If Maven only exposes a simpler tree, JARScan still reports best-effort multi-version findings.
+- Duplicate class detection is limited to the analyzed archive set and bounded by `JARSCAN_MAX_DUPLICATE_CLASS_SCAN_JARS` to avoid excessive scan cost on very large uploads.
+- License analysis is best-effort and may rely on embedded Maven POMs, manifest fields, or license file heuristics; unknown or multiple-license findings should be reviewed manually.
 - Project ZIP analysis is best-effort. If no usable root POM or compiled classes exist, Maven-backed resolution and Java-version evidence will be more limited.

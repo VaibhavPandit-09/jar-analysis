@@ -53,11 +53,14 @@ This file documents the planned JARScan v2 feature set. These items are roadmap 
 
 - surface competing versions in the graph
 - explain which version won and where mismatches exist
+- generate copyable `dependencyManagement` snippets for review
+- implemented in Session 8
 
 ## Dependency Convergence
 
 - identify graphs that do not converge cleanly
 - surface risky or inconsistent transitive version patterns
+- implemented in Session 8 from the parsed dependency tree
 
 ## Unused Dependency Analysis
 
@@ -88,11 +91,15 @@ This file documents the planned JARScan v2 feature set. These items are roadmap 
 
 - surface license information for dependencies
 - support dependency review and compliance awareness
+- classify common licenses into permissive, weak copyleft, strong copyleft, commercial, unknown, or multiple
+- implemented in Session 8 with best-effort embedded-POM and archive evidence
 
 ## Duplicate Class Detection
 
 - detect same class appearing in multiple bundled dependencies
 - help diagnose classpath collision risk
+- optionally surface split packages and common multi-provider collision patterns
+- implemented in Session 8 with bounded archive scanning
 
 ## Fat JAR Inspector
 
@@ -120,3 +127,4 @@ This file documents the planned JARScan v2 feature set. These items are roadmap 
 - richer results navigation
 - settings surfaces
 - dependency tree and drill-down views
+- version conflict, duplicate class, and license review tabs
