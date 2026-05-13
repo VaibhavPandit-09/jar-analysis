@@ -71,6 +71,31 @@ export interface DependencyInfo {
   vulnerabilityCount: number;
 }
 
+export interface DependencyTreeNode {
+  id: string;
+  groupId: string | null;
+  artifactId: string | null;
+  type: string | null;
+  classifier: string | null;
+  version: string | null;
+  scope: string | null;
+  depth: number;
+  parentId: string | null;
+  children: DependencyTreeNode[];
+  direct: boolean;
+  transitive: boolean;
+  omitted: boolean;
+  omittedReason: string | null;
+  conflict: boolean;
+  rawLine: string | null;
+  pathFromRoot: string[];
+}
+
+export interface DependencyTree {
+  sourceFormat: string;
+  roots: DependencyTreeNode[];
+}
+
 export interface ArtifactAnalysis {
   id: string;
   fileName: string;
@@ -171,6 +196,7 @@ export interface AnalysisResult {
   completedAt: string | null;
   summary: AnalysisSummary;
   artifacts: ArtifactAnalysis[];
+  dependencyTree: DependencyTree | null;
   dependencyTreeText: string | null;
   warnings: string[];
   errors: string[];

@@ -14,6 +14,7 @@ public record AnalysisResult(
         Instant completedAt,
         AnalysisSummary summary,
         List<ArtifactAnalysis> artifacts,
+        DependencyTree dependencyTree,
         String dependencyTreeText,
         List<String> warnings,
         List<String> errors,

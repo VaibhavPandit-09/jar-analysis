@@ -28,6 +28,12 @@ This file documents currently visible backend endpoints and planned v2 expansion
   - returns completed result JSON
   - checks active in-memory result first
   - falls back to persisted `result_json` from SQLite when the job is no longer in memory
+  - when Maven tree output exists, the payload now includes:
+    - `dependencyTree`
+      - structured root/child nodes
+      - node fields include `id`, `groupId`, `artifactId`, `type`, `classifier`, `version`, `scope`, `depth`, `parentId`, `children`, `direct`, `transitive`, `omitted`, `omittedReason`, `conflict`, `rawLine`, and `pathFromRoot`
+    - `dependencyTreeText`
+      - raw Maven tree text when text output was used or retained for debugging
 
 - `POST /api/jobs/{jobId}/cancel`
   - requests cancellation of an active job
@@ -62,6 +68,7 @@ Exports currently operate against the existing job/result model. The Session 3 h
 - `GET /api/scans/{scanId}`
   - returns the stored scan summary plus full persisted result
   - used by the reopened scan results route in the frontend
+  - persisted result JSON now preserves parsed `dependencyTree` data when Maven tree output was available during the original scan
 
 - `DELETE /api/scans/{scanId}`
   - deletes a stored scan record
@@ -138,6 +145,8 @@ The following response DTOs are visible or directly implied by controller/servic
 - `AnalysisJobResponse`
 - `AnalysisJobStatusResponse`
 - `AnalysisResult`
+- `DependencyTree`
+- `DependencyTreeNode`
 - `NvdSettingsStatusResponse`
 - `NvdSettingsTestResponse`
 - `ProgressEvent`
@@ -152,6 +161,13 @@ The following response DTOs are visible or directly implied by controller/servic
 Implemented endpoint:
 
 - `GET /api/compare?base={scanId}&target={scanId}`
+
+## Session 7 Dependency Tree Status
+
+Implemented in result payloads:
+
+- Maven dependency tree parsing with JSON-first capture and text fallback
+- `pathFromRoot` per dependency node so the frontend can explain why a dependency is present without an extra API call
 
 ## Planned v2 Settings Endpoints
 

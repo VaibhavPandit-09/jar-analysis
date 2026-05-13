@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { Download, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import { DependencyTreePanel, type DependencyTreeFocusRequest, type DependencyVulnerabilitySummary } from "@/components/dependency-tree-panel";
 import {
   Accordion,
   AccordionContent,
@@ -14,7 +15,16 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { buildJobExportUrl } from "@/lib/api";
-import type { ArtifactAnalysis, AnalysisResult, NestedLibrarySummary, ProjectStructureSummary, Severity, VulnerabilityFinding } from "@/lib/types";
+import { buildDependencyTreeIndex, dependencyCoordinateKey, dependencyKey } from "@/lib/dependency-tree";
+import type {
+  AnalysisResult,
+  ArtifactAnalysis,
+  MavenCoordinates,
+  NestedLibrarySummary,
+  ProjectStructureSummary,
+  Severity,
+  VulnerabilityFinding,
+} from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const severityVariant: Record<Severity, "critical" | "high" | "medium" | "low" | "info" | "neutral"> = {
@@ -174,7 +184,13 @@ function FatJarInspectorTab({ artifact }: { artifact: ArtifactAnalysis }) {
   );
 }
 
-function VulnerabilityTable({ rows }: { rows: VulnerabilityFinding[] }) {
+function VulnerabilityTable({
+  rows,
+  onShowPath,
+}: {
+  rows: VulnerabilityFinding[];
+  onShowPath?: (() => void) | null;
+}) {
   const table = useReactTable({
     data: rows,
     columns: [
@@ -205,6 +221,14 @@ function VulnerabilityTable({ rows }: { rows: VulnerabilityFinding[] }) {
             {row.original.description ?? "No description available"}
           </div>
         ),
+      },
+      {
+        header: "Path",
+        cell: () => onShowPath ? (
+          <button type="button" className="text-sm font-medium text-primary hover:underline" onClick={onShowPath}>
+            Show path
+          </button>
+        ) : <span className="text-muted-foreground">n/a</span>,
       },
     ],
     getCoreRowModel: getCoreRowModel(),
@@ -249,10 +273,14 @@ interface ResultsDashboardProps {
 export function ResultsDashboard({ result, exportJobId, sourceLabel }: ResultsDashboardProps) {
   const [query, setQuery] = useState("");
   const [severityFilter, setSeverityFilter] = useState<Severity | "ALL">("ALL");
+  const [activeResultsTab, setActiveResultsTab] = useState<"artifacts" | "dependency-tree">("artifacts");
+  const [dependencyTreeFocus, setDependencyTreeFocus] = useState<DependencyTreeFocusRequest | null>(null);
+
+  const allArtifacts = useMemo(() => flattenArtifacts(result.artifacts), [result.artifacts]);
+  const dependencyTreeIndex = useMemo(() => buildDependencyTreeIndex(result.dependencyTree), [result.dependencyTree]);
 
   const filteredArtifacts = useMemo(() => {
-    const artifacts = flattenArtifacts(result.artifacts);
-    return artifacts.filter((artifact) => {
+    return allArtifacts.filter((artifact) => {
       const matchesQuery =
         !query ||
         artifact.fileName.toLowerCase().includes(query.toLowerCase()) ||
@@ -265,7 +293,28 @@ export function ResultsDashboard({ result, exportJobId, sourceLabel }: ResultsDa
         artifact.vulnerabilities.some((item) => item.severity === severityFilter);
       return matchesQuery && matchesSeverity;
     });
-  }, [query, result.artifacts, severityFilter]);
+  }, [allArtifacts, query, severityFilter]);
+
+  const dependencyVulnerabilityIndex = useMemo(() => {
+    const index = new Map<string, DependencyVulnerabilitySummary>();
+    allArtifacts.forEach((artifact) => {
+      if (!artifact.coordinates.groupId || !artifact.coordinates.artifactId || !artifact.coordinates.version) {
+        return;
+      }
+      const key = dependencyCoordinateKey(artifact.coordinates);
+      const existing = index.get(key);
+      if (existing) {
+        existing.count += artifact.vulnerabilities.length;
+        existing.vulnerabilities.push(...artifact.vulnerabilities);
+        return;
+      }
+      index.set(key, {
+        count: artifact.vulnerabilities.length,
+        vulnerabilities: [...artifact.vulnerabilities],
+      });
+    });
+    return index;
+  }, [allArtifacts]);
 
   const exportLinks = exportJobId
     ? [
@@ -278,6 +327,19 @@ export function ResultsDashboard({ result, exportJobId, sourceLabel }: ResultsDa
         extension: format === "markdown" ? "md" : format,
       }))
     : [];
+
+  const focusDependencyInTree = (coordinates: MavenCoordinates) => {
+    if (!coordinates.groupId || !coordinates.artifactId) {
+      return;
+    }
+    setActiveResultsTab("dependency-tree");
+    setDependencyTreeFocus({
+      groupId: coordinates.groupId,
+      artifactId: coordinates.artifactId,
+      version: coordinates.version,
+      token: Date.now(),
+    });
+  };
 
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
@@ -318,187 +380,224 @@ export function ResultsDashboard({ result, exportJobId, sourceLabel }: ResultsDa
         ))}
       </section>
 
-      <Card>
-        <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <CardTitle>Results dashboard</CardTitle>
-            <CardDescription>
-              {sourceLabel
-                ? `${sourceLabel}. Filter by artifact name, Maven coordinates, or severity to focus on the riskiest parts of the graph.`
-                : "Filter by artifact name, Maven coordinates, or severity to focus on the riskiest parts of the graph."}
-            </CardDescription>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <div className="flex items-center gap-2 rounded-full border border-border bg-background px-4 py-2">
-              <Search className="h-4 w-4 text-muted-foreground" />
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                className="bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-                placeholder="Search artifacts"
-              />
-            </div>
-            <select
-              value={severityFilter}
-              onChange={(event) => setSeverityFilter(event.target.value as Severity | "ALL")}
-              className="rounded-full border border-border bg-background px-4 py-2 text-sm outline-none"
-            >
-              {["ALL", "CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO", "UNKNOWN"].map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-            {exportLinks.map((link) => (
-              <a
-                key={link.label}
-                href={link.href}
-                download={`jarscan-${exportJobId}.${link.extension}`}
-                className={cn(buttonVariants({ variant: "outline" }))}
-              >
-                {link.label === "JSON" ? <Download className="mr-2 h-4 w-4" /> : null}
-                Export {link.label}
-              </a>
-            ))}
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="flex flex-wrap gap-2">
-            {(["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO", "UNKNOWN"] as Severity[]).map((severity) => (
-              <Badge key={severity} variant={severityVariant[severity]}>
-                {severity}
-              </Badge>
-            ))}
-          </div>
+      <Tabs value={activeResultsTab} onValueChange={(value) => setActiveResultsTab(value as "artifacts" | "dependency-tree")}>
+        <TabsList>
+          <TabsTrigger value="artifacts">Artifacts</TabsTrigger>
+          <TabsTrigger value="dependency-tree">Dependency Tree</TabsTrigger>
+        </TabsList>
 
-          <Accordion type="multiple" className="space-y-4">
-            {filteredArtifacts.map((artifact) => (
-              <AccordionItem key={artifact.id} value={artifact.id}>
-                <AccordionTrigger>
-                  <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
-                    <span className="truncate font-medium">{artifact.fileName}</span>
-                    <Badge variant={severityVariant[artifact.highestSeverity]}>{artifact.highestSeverity}</Badge>
-                    <Badge variant="neutral">{artifact.javaVersion.requiredJava}</Badge>
-                    <Badge variant="neutral">{artifact.vulnerabilityCount} findings</Badge>
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent>
-                  <Tabs defaultValue="overview">
-                    <TabsList>
-                      <TabsTrigger value="overview">Overview</TabsTrigger>
-                      <TabsTrigger value="fat-jar-inspector">Fat JAR Inspector</TabsTrigger>
-                      <TabsTrigger value="manifest">Manifest</TabsTrigger>
-                      <TabsTrigger value="dependencies">Dependencies</TabsTrigger>
-                      <TabsTrigger value="vulnerabilities">Vulnerabilities</TabsTrigger>
-                      <TabsTrigger value="metadata">Raw Metadata</TabsTrigger>
-                    </TabsList>
+        <TabsContent value="artifacts">
+          <Card>
+            <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <CardTitle>Results dashboard</CardTitle>
+                <CardDescription>
+                  {sourceLabel
+                    ? `${sourceLabel}. Filter by artifact name, Maven coordinates, or severity to focus on the riskiest parts of the graph.`
+                    : "Filter by artifact name, Maven coordinates, or severity to focus on the riskiest parts of the graph."}
+                </CardDescription>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <div className="flex items-center gap-2 rounded-full border border-border bg-background px-4 py-2">
+                  <Search className="h-4 w-4 text-muted-foreground" />
+                  <input
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    className="bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                    placeholder="Search artifacts"
+                  />
+                </div>
+                <select
+                  value={severityFilter}
+                  onChange={(event) => setSeverityFilter(event.target.value as Severity | "ALL")}
+                  className="rounded-full border border-border bg-background px-4 py-2 text-sm outline-none"
+                >
+                  {["ALL", "CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO", "UNKNOWN"].map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+                {exportLinks.map((link) => (
+                  <a
+                    key={link.label}
+                    href={link.href}
+                    download={`jarscan-${exportJobId}.${link.extension}`}
+                    className={cn(buttonVariants({ variant: "outline" }))}
+                  >
+                    {link.label === "JSON" ? <Download className="mr-2 h-4 w-4" /> : null}
+                    Export {link.label}
+                  </a>
+                ))}
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex flex-wrap gap-2">
+                {(["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO", "UNKNOWN"] as Severity[]).map((severity) => (
+                  <Badge key={severity} variant={severityVariant[severity]}>
+                    {severity}
+                  </Badge>
+                ))}
+              </div>
 
-                    <TabsContent value="overview" className="grid gap-4 lg:grid-cols-2">
-                      {[
-                        ["Coordinates", `${artifact.coordinates.groupId ?? "unknown"}:${artifact.coordinates.artifactId ?? "unknown"}:${artifact.coordinates.version ?? "unknown"}`],
-                        ["SHA-256", artifact.sha256],
-                        ["Size", formatBytes(artifact.sizeBytes)],
-                        ["Entries", artifact.entryCount],
-                        ["Module type", artifact.moduleType],
-                        ["Fat JAR", artifact.fatJar ? "Yes" : "No"],
-                      ].map(([label, value]) => (
-                        <div key={String(label)} className="rounded-2xl border border-border/70 bg-background/60 px-4 py-4">
-                          <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{label}</div>
-                          <div className="mt-2 break-all text-sm font-medium">{value}</div>
+              <Accordion type="multiple" className="space-y-4">
+                {filteredArtifacts.map((artifact) => {
+                  const pathAvailable = Boolean(
+                    result.dependencyTree &&
+                    artifact.coordinates.groupId &&
+                    artifact.coordinates.artifactId &&
+                    dependencyTreeIndex.byKey.has(dependencyKey(artifact.coordinates)),
+                  );
+
+                  return (
+                    <AccordionItem key={artifact.id} value={artifact.id}>
+                      <AccordionTrigger>
+                        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
+                          <span className="truncate font-medium">{artifact.fileName}</span>
+                          <Badge variant={severityVariant[artifact.highestSeverity]}>{artifact.highestSeverity}</Badge>
+                          <Badge variant="neutral">{artifact.javaVersion.requiredJava}</Badge>
+                          <Badge variant="neutral">{artifact.vulnerabilityCount} findings</Badge>
                         </div>
-                      ))}
-                    </TabsContent>
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        <Tabs defaultValue="overview">
+                          <TabsList>
+                            <TabsTrigger value="overview">Overview</TabsTrigger>
+                            <TabsTrigger value="fat-jar-inspector">Fat JAR Inspector</TabsTrigger>
+                            <TabsTrigger value="manifest">Manifest</TabsTrigger>
+                            <TabsTrigger value="dependencies">Dependencies</TabsTrigger>
+                            <TabsTrigger value="vulnerabilities">Vulnerabilities</TabsTrigger>
+                            <TabsTrigger value="metadata">Raw Metadata</TabsTrigger>
+                          </TabsList>
 
-                    <TabsContent value="fat-jar-inspector">
-                      <FatJarInspectorTab artifact={artifact} />
-                    </TabsContent>
-
-                    <TabsContent value="manifest">
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        {Object.entries(artifact.manifest.attributes).map(([key, value]) => (
-                          <div key={key} className="rounded-2xl border border-border/70 bg-background/60 px-4 py-3">
-                            <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{key}</div>
-                            <div className="mt-2 text-sm">{value}</div>
-                          </div>
-                        ))}
-                        {Object.keys(artifact.manifest.attributes).length === 0 ? (
-                          <div className="rounded-2xl border border-border/70 bg-background/60 px-4 py-5 text-sm text-muted-foreground">
-                            No manifest attributes were available for this artifact.
-                          </div>
-                        ) : null}
-                      </div>
-                    </TabsContent>
-
-                    <TabsContent value="dependencies">
-                      <div className="overflow-hidden rounded-3xl border border-border/70">
-                        <table className="min-w-full divide-y divide-border/70 text-sm">
-                          <thead className="bg-secondary/60 text-left">
-                            <tr>
-                              {["Artifact", "Coordinates", "Scope", "Java", "Findings"].map((header) => (
-                                <th key={header} className="px-4 py-3 font-medium text-muted-foreground">
-                                  {header}
-                                </th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-border/60 bg-background/70">
-                            {artifact.dependencies.map((dependency) => (
-                              <tr key={`${dependency.artifact}-${dependency.coordinates.version}`}>
-                                <td className="px-4 py-3">{dependency.artifact}</td>
-                                <td className="px-4 py-3 text-muted-foreground">
-                                  {dependency.coordinates.groupId ?? "unknown"}:
-                                  {dependency.coordinates.artifactId ?? "unknown"}:
-                                  {dependency.coordinates.version ?? "unknown"}
-                                </td>
-                                <td className="px-4 py-3">{dependency.scope ?? "n/a"}</td>
-                                <td className="px-4 py-3">{dependency.javaVersion ?? "Unknown"}</td>
-                                <td className="px-4 py-3">{dependency.vulnerabilityCount}</td>
-                              </tr>
+                          <TabsContent value="overview" className="grid gap-4 lg:grid-cols-2">
+                            {[
+                              ["Coordinates", `${artifact.coordinates.groupId ?? "unknown"}:${artifact.coordinates.artifactId ?? "unknown"}:${artifact.coordinates.version ?? "unknown"}`],
+                              ["SHA-256", artifact.sha256],
+                              ["Size", formatBytes(artifact.sizeBytes)],
+                              ["Entries", artifact.entryCount],
+                              ["Module type", artifact.moduleType],
+                              ["Fat JAR", artifact.fatJar ? "Yes" : "No"],
+                            ].map(([label, value]) => (
+                              <div key={String(label)} className="rounded-2xl border border-border/70 bg-background/60 px-4 py-4">
+                                <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{label}</div>
+                                <div className="mt-2 break-all text-sm font-medium">{value}</div>
+                              </div>
                             ))}
-                            {artifact.dependencies.length === 0 ? (
-                              <tr>
-                                <td colSpan={5} className="px-4 py-5 text-muted-foreground">
-                                  No embedded dependencies were detected for this artifact.
-                                </td>
-                              </tr>
-                            ) : null}
-                          </tbody>
-                        </table>
-                      </div>
-                    </TabsContent>
+                          </TabsContent>
 
-                    <TabsContent value="vulnerabilities">
-                      <VulnerabilityTable rows={artifact.vulnerabilities} />
-                    </TabsContent>
+                          <TabsContent value="fat-jar-inspector">
+                            <FatJarInspectorTab artifact={artifact} />
+                          </TabsContent>
 
-                    <TabsContent value="metadata">
-                      <pre className="overflow-x-auto rounded-3xl border border-border/70 bg-slate-950 p-4 text-xs text-slate-200">
-                        {JSON.stringify(artifact.rawMetadata, null, 2)}
-                      </pre>
-                    </TabsContent>
-                  </Tabs>
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
-        </CardContent>
-      </Card>
+                          <TabsContent value="manifest">
+                            <div className="grid gap-3 sm:grid-cols-2">
+                              {Object.entries(artifact.manifest.attributes).map(([key, value]) => (
+                                <div key={key} className="rounded-2xl border border-border/70 bg-background/60 px-4 py-3">
+                                  <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{key}</div>
+                                  <div className="mt-2 text-sm">{value}</div>
+                                </div>
+                              ))}
+                              {Object.keys(artifact.manifest.attributes).length === 0 ? (
+                                <div className="rounded-2xl border border-border/70 bg-background/60 px-4 py-5 text-sm text-muted-foreground">
+                                  No manifest attributes were available for this artifact.
+                                </div>
+                              ) : null}
+                            </div>
+                          </TabsContent>
 
-      {result.dependencyTreeText ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Dependency tree</CardTitle>
-            <CardDescription>
-              Raw Maven dependency tree output captured during the uploaded POM resolution workflow.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <pre className="overflow-x-auto rounded-3xl border border-border/70 bg-slate-950 p-4 text-xs text-slate-200">
-              {result.dependencyTreeText}
-            </pre>
-          </CardContent>
-        </Card>
-      ) : null}
+                          <TabsContent value="dependencies">
+                            <div className="overflow-hidden rounded-3xl border border-border/70">
+                              <table className="min-w-full divide-y divide-border/70 text-sm">
+                                <thead className="bg-secondary/60 text-left">
+                                  <tr>
+                                    {["Artifact", "Coordinates", "Scope", "Java", "Findings"].map((header) => (
+                                      <th key={header} className="px-4 py-3 font-medium text-muted-foreground">
+                                        {header}
+                                      </th>
+                                    ))}
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-border/60 bg-background/70">
+                                  {artifact.dependencies.map((dependency) => (
+                                    <tr key={`${dependency.artifact}-${dependency.coordinates.version}`}>
+                                      <td className="px-4 py-3">{dependency.artifact}</td>
+                                      <td className="px-4 py-3 text-muted-foreground">
+                                        {dependency.coordinates.groupId ?? "unknown"}:
+                                        {dependency.coordinates.artifactId ?? "unknown"}:
+                                        {dependency.coordinates.version ?? "unknown"}
+                                      </td>
+                                      <td className="px-4 py-3">{dependency.scope ?? "n/a"}</td>
+                                      <td className="px-4 py-3">{dependency.javaVersion ?? "Unknown"}</td>
+                                      <td className="px-4 py-3">{dependency.vulnerabilityCount}</td>
+                                    </tr>
+                                  ))}
+                                  {artifact.dependencies.length === 0 ? (
+                                    <tr>
+                                      <td colSpan={5} className="px-4 py-5 text-muted-foreground">
+                                        No embedded dependencies were detected for this artifact.
+                                      </td>
+                                    </tr>
+                                  ) : null}
+                                </tbody>
+                              </table>
+                            </div>
+                          </TabsContent>
+
+                          <TabsContent value="vulnerabilities">
+                            <VulnerabilityTable
+                              rows={artifact.vulnerabilities}
+                              onShowPath={pathAvailable ? () => focusDependencyInTree(artifact.coordinates) : null}
+                            />
+                          </TabsContent>
+
+                          <TabsContent value="metadata">
+                            <pre className="overflow-x-auto rounded-3xl border border-border/70 bg-slate-950 p-4 text-xs text-slate-200">
+                              {JSON.stringify(artifact.rawMetadata, null, 2)}
+                            </pre>
+                          </TabsContent>
+                        </Tabs>
+                      </AccordionContent>
+                    </AccordionItem>
+                  );
+                })}
+              </Accordion>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="dependency-tree">
+          {result.dependencyTree && result.dependencyTree.roots.length > 0 ? (
+            <DependencyTreePanel
+              tree={result.dependencyTree}
+              dependencyTreeText={result.dependencyTreeText}
+              vulnerabilityIndex={dependencyVulnerabilityIndex}
+              focusRequest={dependencyTreeFocus}
+            />
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle>Dependency tree unavailable</CardTitle>
+                <CardDescription>
+                  JARScan can only reconstruct a full Maven graph when Maven tree output is available from an uploaded `pom.xml` or a project ZIP with a usable root `pom.xml`.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm text-muted-foreground">
+                <div>Standalone JAR, WAR, and EAR uploads can still surface packaged libraries, manifests, Java version evidence, and vulnerabilities.</div>
+                <div>Upload `pom.xml` or a project ZIP to capture a complete dependency tree and explain why a transitive dependency is present.</div>
+                {result.dependencyTreeText ? (
+                  <details className="rounded-3xl border border-border/70 bg-background/70 px-4 py-4">
+                    <summary className="cursor-pointer font-medium text-foreground">Show raw Maven tree output</summary>
+                    <pre className="mt-4 overflow-x-auto rounded-2xl bg-slate-950 p-4 text-xs text-slate-200">
+                      {result.dependencyTreeText}
+                    </pre>
+                  </details>
+                ) : null}
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+      </Tabs>
     </motion.div>
   );
 }

@@ -38,12 +38,16 @@ This file documents the planned JARScan v2 feature set. These items are roadmap 
 ## Dependency Tree Visualization
 
 - parsed Maven dependency tree
-- graphical or structured hierarchical display
+- structured hierarchical display with expand/collapse controls
+- search, scope filtering, and direct/transitive filtering
+- conflict and omitted-node highlighting where Maven output exposes that context
+- implemented in Session 7
 
 ## Path-To-Dependency
 
 - explain why a dependency is present
 - show transitive path(s) from root dependency to target dependency
+- implemented in Session 7 through per-node `pathFromRoot` data and dependency-tree side-panel drill-down
 
 ## Version Conflict Analysis
 

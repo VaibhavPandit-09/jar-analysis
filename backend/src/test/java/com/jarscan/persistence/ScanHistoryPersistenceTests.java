@@ -288,6 +288,7 @@ class ScanHistoryPersistenceTests {
                 new AnalysisSummary(1, 3, 1, 2, 0, 1, 1, 0, 0, 0, 8.7, "Java 17"),
                 List.of(artifact),
                 null,
+                null,
                 List.of(),
                 List.of(),
                 null
@@ -349,6 +350,7 @@ class ScanHistoryPersistenceTests {
                         vulnerabilities.stream().map(VulnerabilityFinding::cvssScore).filter(java.util.Objects::nonNull).max(Double::compareTo).orElse(null),
                         javaVersion),
                 List.of(artifact),
+                null,
                 null,
                 List.of(),
                 List.of(),

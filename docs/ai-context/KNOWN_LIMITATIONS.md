@@ -46,6 +46,10 @@ JARScan does not provide general source-code vulnerability scanning. It must not
 
 If an uploaded archive lacks embedded Maven metadata or related POM context, JARScan can still inspect packaged contents but may not be able to reconstruct a full dependency graph accurately.
 
+## Dependency Tree Visualization Depends On Maven Tree Output
+
+The Session 7 dependency tree UI only appears when Maven `dependency:tree` output could be captured and parsed from an uploaded `pom.xml` or a project ZIP with a usable root `pom.xml`.
+
 ## Project ZIPs Without Compiled Classes Are Less Reliable For Usage Analysis
 
 Future project ZIP analysis may still be helpful, but if compiled classes are absent then bytecode-backed usage evidence becomes weaker and confidence should be reduced.

@@ -4,6 +4,7 @@ import com.jarscan.dto.AnalysisJobResponse;
 import com.jarscan.dto.AnalysisJobStatusResponse;
 import com.jarscan.dto.AnalysisResult;
 import com.jarscan.dto.ArtifactAnalysis;
+import com.jarscan.dto.DependencyTree;
 import com.jarscan.dto.ProgressEvent;
 import com.jarscan.dto.ProjectStructureSummary;
 import com.jarscan.job.AnalysisJob;
@@ -144,6 +145,7 @@ public class AnalysisJobService {
 
             List<ArtifactAnalysis> artifacts = new ArrayList<>();
             List<Path> analysisTargets = storedFiles;
+            DependencyTree dependencyTree = null;
             String dependencyTreeText = null;
             ProjectStructureSummary projectStructure = null;
             if (job.inputType() == InputType.POM) {
@@ -152,6 +154,7 @@ public class AnalysisJobService {
                 MavenResolutionResult resolutionResult = mavenResolutionService.resolveDependencies(job, pomPath, "runtime", line ->
                         publish(job, ProgressEventType.LOG, ProgressPhase.MAVEN_RESOLUTION, line, null, extractCurrentItem(line), null, null));
                 analysisTargets = resolutionResult.resolvedArtifacts();
+                dependencyTree = resolutionResult.dependencyTree();
                 dependencyTreeText = resolutionResult.dependencyTreeText();
                 publish(job, ProgressEventType.PROGRESS, ProgressPhase.MAVEN_RESOLUTION,
                         "Resolved " + analysisTargets.size() + " Maven dependencies",
@@ -175,6 +178,7 @@ public class AnalysisJobService {
                     MavenResolutionResult resolutionResult = mavenResolutionService.resolveDependencies(job, detection.rootPom(), "runtime", line ->
                             publish(job, ProgressEventType.LOG, ProgressPhase.MAVEN_RESOLUTION, line, null, extractCurrentItem(line), null, null));
                     combinedTargets.addAll(resolutionResult.resolvedArtifacts());
+                    dependencyTree = resolutionResult.dependencyTree();
                     dependencyTreeText = resolutionResult.dependencyTreeText();
                 }
                 analysisTargets = distinctTargets(combinedTargets);
@@ -216,6 +220,7 @@ public class AnalysisJobService {
                     Instant.now(),
                     AnalysisSummaryFactory.create(job.inputType(), artifacts),
                     artifacts,
+                    dependencyTree,
                     dependencyTreeText,
                     List.copyOf(job.warnings()),
                     List.copyOf(job.errors()),

@@ -39,9 +39,11 @@ These routes are defined in `frontend/src/App.tsx`.
 - fetches either `/api/jobs/{jobId}/result` or `/api/scans/{scanId}`
 - renders summary cards
 - renders severity rollups
+- shows top-level results tabs for artifacts and dependency tree views
 - shows artifact accordions with tabs
 - supports export links
-- shows dependency-tree text when present
+- renders a structured dependency tree when `result.dependencyTree` is available
+- preserves raw dependency-tree text as a secondary debugging surface when present
 - reuses the same dashboard UI for fresh and reopened persisted scans
 - shows project structure summary when the scan came from a project ZIP
 - exposes a Fat JAR Inspector tab per artifact for fat JAR, WAR, and EAR packaging details
@@ -173,7 +175,10 @@ Current results page structure:
 - optional project structure summary cards
 - top summary cards
 - severity summary cards
-- filters for text query and severity
+- top-level results tabs:
+  - artifacts
+  - dependency tree
+- artifact filters for text query and severity
 - artifact accordion list
 - per-artifact tabs:
   - overview
@@ -182,7 +187,14 @@ Current results page structure:
   - dependencies
   - vulnerabilities
   - raw metadata
-- optional dependency-tree block
+- dependency tree controls:
+  - expand/collapse all
+  - search
+  - scope filter
+  - direct/transitive filter
+  - selected-node side panel
+  - why-is-this-dependency-here path panel
+- vulnerability tables can jump into the dependency tree tab through `Show path`
 - export actions for JSON, Markdown, and HTML
 
 The reusable results dashboard now sits underneath both:

@@ -69,7 +69,7 @@ Current package layout under `backend/src/main/java/com/jarscan`:
 - creates per-job workspaces
 - decides archive versus `pom.xml` flow
 - now also handles project ZIP extraction and structure detection flow
-- orchestrates Maven resolution, artifact analysis, vulnerability scanning, and final result creation
+- orchestrates Maven resolution, dependency-tree attachment, artifact analysis, vulnerability scanning, and final result creation
 - publishes SSE progress events
 - handles cancellation
 - now persists terminal scan state through `ScanHistoryService`
@@ -122,8 +122,15 @@ Current package layout under `backend/src/main/java/com/jarscan`:
 - builds Maven CLI commands
 - executes Maven with `ProcessBuilder`
 - copies resolved dependencies into a job-local directory
-- captures dependency-tree output
+- prefers machine-readable Maven dependency-tree capture when available
+- falls back to parsing text-tree output when JSON output is unavailable
+- attaches parsed dependency-tree nodes plus raw text fallback into the resolution result
 - streams Maven log output upward
+
+### `DependencyPathService`
+
+- resolves one or more root-to-node paths for a dependency key (`groupId:artifactId`)
+- supports path-to-dependency UI and future backend drill-down use cases
 
 ### `ProgressEventService`
 
@@ -192,6 +199,8 @@ These exist to keep controller DTOs and database row mapping separated from job 
 Visible DTO and model roles:
 
 - `AnalysisResult`: completed job payload
+- `DependencyTree`: structured Maven dependency tree payload
+- `DependencyTreeNode`: individual dependency tree node with path metadata
 - `AnalysisSummary`: top-level totals and severity summary
 - `ArtifactAnalysis`: per-artifact result including nested artifacts
 - `DependencyInfo`: dependency rows shown in UI
@@ -209,6 +218,12 @@ Visible DTO and model roles:
 - `ManifestInfo`: manifest fields and raw attributes
 - `JavaVersionInfo`: bytecode version summary
 - `AnalysisJob`: mutable active job state
+
+## Session 7 Dependency Tree Notes
+
+- Maven tree parsing is intentionally resilient: JSON output is preferred, but text parsing remains the compatibility fallback.
+- Parsed dependency trees are persisted inside `result_json`, so reopened scans can render the same dependency-path UI without rerunning Maven.
+- `pathFromRoot` is stored per node to keep the path-to-dependency experience simple and deterministic in the frontend.
 
 ## Configuration Layer
 

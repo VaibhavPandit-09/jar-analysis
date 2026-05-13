@@ -14,14 +14,14 @@ const baseResult: AnalysisResult = {
     totalArtifacts: 1,
     totalDependencies: 0,
     vulnerableDependencies: 0,
-    totalVulnerabilities: 0,
+    totalVulnerabilities: 1,
     critical: 0,
-    high: 0,
+    high: 1,
     medium: 0,
     low: 0,
     info: 0,
     unknown: 0,
-    highestCvss: null,
+    highestCvss: 7.5,
     requiredJavaVersion: "Java 17",
   },
   artifacts: [
@@ -34,7 +34,7 @@ const baseResult: AnalysisResult = {
       fatJar: false,
       parentPath: null,
       nestedDepth: 0,
-      coordinates: { groupId: "com.example", artifactId: "app", version: "1.0.0" },
+      coordinates: { groupId: "org.example", artifactId: "leaf", version: "1.2.3" },
       javaVersion: { minMajor: 61, maxMajor: 61, requiredJava: "Java 17", multiRelease: false },
       manifest: {
         mainClass: "com.example.Main",
@@ -48,10 +48,22 @@ const baseResult: AnalysisResult = {
         attributes: {},
       },
       moduleType: "CLASSPATH_JAR",
-      highestSeverity: "UNKNOWN",
-      vulnerabilityCount: 0,
+      highestSeverity: "HIGH",
+      vulnerabilityCount: 1,
       dependencies: [],
-      vulnerabilities: [],
+      vulnerabilities: [
+        {
+          severity: "HIGH",
+          cveId: "CVE-2026-0001",
+          cvssScore: 7.5,
+          packageName: "pkg:maven/org.example/leaf@1.2.3",
+          installedVersion: "1.2.3",
+          affectedVersionRange: null,
+          description: "Example vulnerability",
+          references: [],
+          source: "dependency-check",
+        },
+      ],
       nestedArtifacts: [],
       rawMetadata: {},
       packagingInspection: {
@@ -83,7 +95,75 @@ const baseResult: AnalysisResult = {
       },
     },
   ],
-  dependencyTreeText: null,
+  dependencyTree: {
+    sourceFormat: "TEXT",
+    roots: [
+      {
+        id: "root",
+        groupId: "com.example",
+        artifactId: "demo",
+        type: "pom",
+        classifier: null,
+        version: "1.0.0",
+        scope: null,
+        depth: 0,
+        parentId: null,
+        direct: false,
+        transitive: false,
+        omitted: false,
+        omittedReason: null,
+        conflict: false,
+        rawLine: null,
+        pathFromRoot: ["com.example:demo:1.0.0"],
+        children: [
+          {
+            id: "parent",
+            groupId: "org.example",
+            artifactId: "parent",
+            type: "jar",
+            classifier: null,
+            version: "2.0.0",
+            scope: "runtime",
+            depth: 1,
+            parentId: "root",
+            direct: true,
+            transitive: false,
+            omitted: false,
+            omittedReason: null,
+            conflict: false,
+            rawLine: "[INFO] +- org.example:parent:jar:2.0.0:runtime",
+            pathFromRoot: ["com.example:demo:1.0.0", "org.example:parent:2.0.0"],
+            children: [
+              {
+                id: "leaf",
+                groupId: "org.example",
+                artifactId: "leaf",
+                type: "jar",
+                classifier: null,
+                version: "1.2.3",
+                scope: "runtime",
+                depth: 2,
+                parentId: "parent",
+                direct: false,
+                transitive: true,
+                omitted: false,
+                omittedReason: null,
+                conflict: false,
+                rawLine: "[INFO] |  \\- org.example:leaf:jar:1.2.3:runtime",
+                pathFromRoot: [
+                  "com.example:demo:1.0.0",
+                  "org.example:parent:2.0.0",
+                  "org.example:leaf:1.2.3",
+                ],
+                children: [],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  dependencyTreeText: "[INFO] com.example:demo:pom:1.0.0",
   warnings: [],
   errors: [],
   projectStructure: {
@@ -121,5 +201,25 @@ describe("ResultsDashboard", () => {
     await userEvent.click(screen.getByRole("button", { name: /app\.jar/i }));
     await userEvent.click(screen.getByRole("tab", { name: /Fat JAR Inspector/i }));
     expect(screen.getByText(/not a fat JAR, WAR, or EAR/i)).toBeInTheDocument();
+  });
+
+  it("renders dependency tree tab and selected node details", async () => {
+    render(<ResultsDashboard result={baseResult} />);
+
+    await userEvent.click(screen.getByRole("tab", { name: /Dependency Tree/i }));
+
+    expect(screen.getByText(/Parsed Maven dependency graph/i)).toBeInTheDocument();
+    expect(screen.getByText(/org\.example:parent:2\.0\.0/i)).toBeInTheDocument();
+  });
+
+  it("switches to dependency tree when show path is clicked", async () => {
+    render(<ResultsDashboard result={baseResult} />);
+
+    await userEvent.click(screen.getByRole("button", { name: /app\.jar/i }));
+    await userEvent.click(screen.getByRole("tab", { name: /Vulnerabilities/i }));
+    await userEvent.click(screen.getByRole("button", { name: /Show path/i }));
+
+    expect(screen.getByText(/Why is this dependency here\?/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/org\.example:leaf:1\.2\.3/i).length).toBeGreaterThan(0);
   });
 });
