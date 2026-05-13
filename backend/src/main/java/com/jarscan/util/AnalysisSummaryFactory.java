@@ -7,6 +7,7 @@ import com.jarscan.dto.ConvergenceFinding;
 import com.jarscan.dto.DependencyUsageFinding;
 import com.jarscan.dto.DuplicateClassFinding;
 import com.jarscan.dto.LicenseFinding;
+import com.jarscan.dto.PolicyEvaluation;
 import com.jarscan.dto.SlimmingOpportunity;
 import com.jarscan.dto.VersionConflictFinding;
 import com.jarscan.dto.VulnerabilityFinding;
@@ -30,7 +31,8 @@ public final class AnalysisSummaryFactory {
             List<LicenseFinding> licenses,
             List<DependencyUsageFinding> dependencyUsageFindings,
             List<SlimmingOpportunity> slimmingOpportunities,
-            AwsBundleAdvice awsBundleAdvice
+            AwsBundleAdvice awsBundleAdvice,
+            PolicyEvaluation policyEvaluation
     ) {
         List<ArtifactAnalysis> flattenedArtifacts = flattenArtifacts(artifacts);
         List<VulnerabilityFinding> findings = flattenedArtifacts.stream()
@@ -111,7 +113,10 @@ public final class AnalysisSummaryFactory {
                 possiblyRuntimeUsedCount,
                 slimmingOpportunities.size(),
                 estimatedRemovableSizeBytes,
-                awsBundleAdvice == null ? 0 : 1
+                awsBundleAdvice == null ? 0 : 1,
+                policyEvaluation == null ? 0 : policyEvaluation.warningCount(),
+                policyEvaluation == null ? 0 : policyEvaluation.failedCount(),
+                policyEvaluation == null ? null : policyEvaluation.overallStatus()
         );
     }
 

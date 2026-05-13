@@ -1,34 +1,17 @@
 # Database Schema
 
-## Current Persistence State
+## Current Tables
 
-As of Session 2, JARScan persists completed scan history in SQLite.
+### `scans`
 
-Current database location rules:
+Stores:
+- fast relational summary columns
+- full `result_json`
+- notes and tags
+- input metadata
+- status and timestamps
 
-- `JARSCAN_DB_PATH` if explicitly provided
-- otherwise `${JARSCAN_DATA_DIR}/jarscan.db`
-- otherwise `/app/data/jarscan.db`
-
-For local development and tests, the backend may override this to a workspace-local path such as `./data/jarscan.db` or `backend/target/test-data/jarscan.db`.
-
-What still persists outside SQLite:
-
-- Maven cache in `/root/.m2`
-- Dependency-Check cache in `/app/data/dependency-check`
-- raw NVD API key in `/app/data/secrets/nvd-api-key`
-
-What is still in-memory:
-
-- active job registry
-- active SSE emitter state and replay buffers
-
-## Current `scans` Table
-
-The current Flyway migration creates a single `scans` table intended to support fast history listing plus exact result reopening.
-
-Columns:
-
+Key columns:
 - `id`
 - `job_id`
 - `input_type`
@@ -56,99 +39,54 @@ Columns:
 - `created_at`
 - `updated_at`
 
-Important constraints and indexes:
+### `app_settings`
 
-- `job_id` is unique
-- index on `created_at`
-- index on `status`
-- index on `input_type`
-- index on `completed_at`
+Stores general application metadata.
 
-## Current `app_settings` Table
+Current uses include:
+- masked NVD key metadata
+- vulnerability DB sync timestamps and status
 
-Session 4 adds a general-purpose `app_settings` table.
+The raw NVD API key itself is not stored in SQLite.
+
+### `suppressions`
 
 Columns:
-
-- `key`
-- `value`
-- `encrypted`
-- `created_at`
-- `updated_at`
-
-Current uses:
-
-- NVD API key metadata such as masked suffix
-- vulnerability DB sync metadata such as last sync status and duration
-
-Important note:
-
-- the raw NVD API key is not stored in SQLite
-- the `encrypted` column exists for future evolution, but the current NVD secret strategy stores the raw key in a restricted local file instead
-
-## Summary Columns Plus `result_json` Approach
-
-JARScan intentionally stores both:
-
-- relational summary columns for fast listing, filtering, sorting, and future comparison
-- full `result_json` for exact result reopening, export reuse, and schema-flexible evolution
-
-This keeps the first persistence layer maintainable without immediately normalizing every nested artifact, dependency, or vulnerability into separate tables.
-
-## App Settings Direction
-
-Additional likely settings for future sessions:
-
-- default Maven dependency scope
-- UI and scan defaults as needed
-- future policy or suppression preferences
-
-## Planned `suppressions` Table
-
-Likely direction for Session 10:
-
 - `id`
-- `created_at`
-- `updated_at`
-- `match_type`
-- `match_value`
+- `type`
+- `group_id`
+- `artifact_id`
+- `version`
+- `cve_id`
 - `reason`
 - `expires_at`
 - `active`
+- `created_at`
+- `updated_at`
 
-Possible targets:
+### `policies`
 
-- vulnerability identifiers
-- package identifiers
-- Maven coordinates
-- dependency paths
-
-## Planned `policies` Table
-
-Likely direction for Session 10:
-
+Columns:
 - `id`
 - `name`
 - `description`
+- `rule_type`
+- `severity`
 - `enabled`
 - `config_json`
 - `created_at`
 - `updated_at`
 
-`config_json` is the expected escape hatch for policy evolution without frequent schema churn.
+## Persistence Notes
 
-## Migration Notes
+- raw completed results remain in `result_json`
+- suppressions and policies are stored separately and applied at read time
+- Flyway manages schema evolution
+- current schema versions include `V1` through `V4`
 
-Current schema management:
+## Non-SQLite Local State
 
-- Flyway is enabled in the backend
-- migrations currently create:
-  - `scans`
-  - `app_settings`
-
-Guidance for future sessions:
-
-- keep current `AnalysisResult` JSON shape stable where practical
-- prefer additive migrations over destructive schema changes
-- preserve backward compatibility for stored `result_json`
-- treat summary columns as denormalized indexes over the full stored result
+Still stored outside SQLite:
+- Maven cache
+- Dependency-Check data cache
+- raw NVD API key secret file

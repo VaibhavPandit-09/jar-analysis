@@ -1,6 +1,16 @@
 export type JobStatus = "QUEUED" | "RUNNING" | "COMPLETED" | "FAILED" | "CANCELLED";
-export type InputType = "ARCHIVE_UPLOAD" | "POM" | "PROJECT_ZIP";
+export type InputType = "ARCHIVE_UPLOAD" | "POM" | "PROJECT_ZIP" | "SBOM";
 export type Severity = "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" | "INFO" | "UNKNOWN";
+export type SuppressionType =
+  | "VULNERABILITY"
+  | "LICENSE"
+  | "POLICY"
+  | "DEPENDENCY"
+  | "VERSION_CONFLICT"
+  | "DUPLICATE_CLASS"
+  | "USAGE";
+export type PolicySeverity = "WARN" | "FAIL";
+export type PolicyStatus = "PASSED" | "WARNING" | "FAILED";
 export type ProgressEventType =
   | "STARTED"
   | "PROGRESS"
@@ -60,6 +70,9 @@ export interface VulnerabilityFinding {
   description: string | null;
   references: string[];
   source: string | null;
+  suppressed?: boolean;
+  suppressionReason?: string | null;
+  suppressionExpiresAt?: string | null;
 }
 
 export interface DependencyInfo {
@@ -106,6 +119,9 @@ export interface VersionConflictFinding {
   riskLevel: string;
   recommendation: string;
   dependencyManagementSnippet: string | null;
+  suppressed?: boolean;
+  suppressionReason?: string | null;
+  suppressionExpiresAt?: string | null;
 }
 
 export interface ConvergenceFinding {
@@ -116,6 +132,9 @@ export interface ConvergenceFinding {
   selectedVersion: string | null;
   recommendation: string;
   snippet: string | null;
+  suppressed?: boolean;
+  suppressionReason?: string | null;
+  suppressionExpiresAt?: string | null;
 }
 
 export interface DuplicateClassFinding {
@@ -126,6 +145,9 @@ export interface DuplicateClassFinding {
   severity: string;
   recommendation: string;
   shadowingWarning: string;
+  suppressed?: boolean;
+  suppressionReason?: string | null;
+  suppressionExpiresAt?: string | null;
 }
 
 export interface LicenseFinding {
@@ -138,6 +160,9 @@ export interface LicenseFinding {
   confidence: string;
   category: string;
   warnings: string[];
+  suppressed?: boolean;
+  suppressionReason?: string | null;
+  suppressionExpiresAt?: string | null;
 }
 
 export interface DependencyUsageFinding {
@@ -152,6 +177,31 @@ export interface DependencyUsageFinding {
   paths: string[][];
   sizeBytes: number | null;
   vulnerabilitiesContributed: number | null;
+  suppressed?: boolean;
+  suppressionReason?: string | null;
+  suppressionExpiresAt?: string | null;
+}
+
+export interface PolicyFinding {
+  policyId: string;
+  policyName: string;
+  ruleType: string;
+  status: PolicyStatus;
+  severity: PolicySeverity;
+  message: string;
+  affectedDependencies: string[];
+  recommendation: string;
+  suppressed: boolean;
+  suppressionReason: string | null;
+  suppressionExpiresAt: string | null;
+}
+
+export interface PolicyEvaluation {
+  overallStatus: PolicyStatus;
+  passedCount: number;
+  warningCount: number;
+  failedCount: number;
+  findings: PolicyFinding[];
 }
 
 export interface SlimmingOpportunity {
@@ -284,6 +334,9 @@ export interface AnalysisSummary {
   slimmingOpportunityCount: number;
   estimatedRemovableSizeBytes: number;
   awsBundleWarningCount: number;
+  policyWarningCount?: number;
+  policyFailureCount?: number;
+  overallPolicyStatus?: PolicyStatus | null;
 }
 
 export interface AnalysisResult {
@@ -302,6 +355,7 @@ export interface AnalysisResult {
   dependencyUsage: DependencyUsageFinding[];
   slimmingOpportunities: SlimmingOpportunity[];
   awsBundleAdvice: AwsBundleAdvice | null;
+  policyEvaluation?: PolicyEvaluation | null;
   dependencyTreeText: string | null;
   warnings: string[];
   errors: string[];
@@ -407,6 +461,76 @@ export interface StoredScanQuery {
 export interface UpdateStoredScanPayload {
   notes?: string | null;
   tags?: string[];
+}
+
+export interface SuppressionRecord {
+  id: string;
+  type: SuppressionType;
+  groupId: string | null;
+  artifactId: string | null;
+  version: string | null;
+  cveId: string | null;
+  reason: string;
+  expiresAt: string | null;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateSuppressionPayload {
+  type: SuppressionType;
+  groupId?: string | null;
+  artifactId?: string | null;
+  version?: string | null;
+  cveId?: string | null;
+  reason: string;
+  expiresAt?: string | null;
+  active?: boolean;
+}
+
+export interface UpdateSuppressionPayload {
+  groupId?: string | null;
+  artifactId?: string | null;
+  version?: string | null;
+  cveId?: string | null;
+  reason?: string | null;
+  expiresAt?: string | null;
+  active?: boolean;
+}
+
+export interface PolicyRecord {
+  id: string;
+  name: string;
+  description: string | null;
+  ruleType: string;
+  severity: PolicySeverity;
+  enabled: boolean;
+  config: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreatePolicyPayload {
+  id: string;
+  name: string;
+  description?: string | null;
+  ruleType: string;
+  severity: PolicySeverity;
+  enabled?: boolean;
+  config?: Record<string, unknown>;
+}
+
+export interface UpdatePolicyPayload {
+  name?: string | null;
+  description?: string | null;
+  severity?: PolicySeverity;
+  enabled?: boolean;
+  config?: Record<string, unknown>;
+}
+
+export interface SbomImportResponse {
+  scanId: string;
+  jobId: string;
 }
 
 export type DependencyChangeType = "ADDED" | "REMOVED" | "UPDATED" | "UNCHANGED";

@@ -1,103 +1,22 @@
 # Known Limitations
 
-## Dependency-Check DB Freshness
-
-Dependency-Check results depend on the freshness and health of the local vulnerability database. Cold starts, stale local data, or failed updates can affect finding completeness or timeliness.
-
-## NVD API Key Performance Differences
-
-JARScan remains usable without an NVD API key, but users should expect slower or more rate-limited database update behavior compared with a configured key.
-
-## Local Secret Storage Depends On Host Security
-
-The NVD API key is masked in the UI and never returned after save, but it is still stored locally on disk for this Docker-first workflow. Anyone with access to the host filesystem or persisted Docker volume may still be able to access the configured secret file.
-
-## Private Maven Repository Authentication
-
-Uploaded `pom.xml` resolution depends on the Maven CLI environment inside the container. Private repository credentials, mirrors, or custom settings are not automatically available unless explicitly provided.
-
-## Running Jobs And Live SSE State Are Still In-Memory
-
-Completed scan history is now persisted in SQLite under `/app/data/jarscan.db`, but active jobs, live progress state, and SSE replay buffers are still runtime-only. A container restart during an in-flight job will still lose that active execution state.
-
-## NVD Key Validation Is Best-Effort
-
-The settings page performs best-effort local validation of the stored NVD API key format. It does not guarantee that the key is currently accepted by NVD or that upstream services are reachable.
-
-## Unused Dependency Confidence Caveats
-
-Future unused dependency analysis should never be treated as perfectly certain. Java applications often use dependencies indirectly through frameworks, generated code, reflection, plugin loading, or runtime configuration.
-
-## Maven dependency:analyze Is Only One Signal
-
-Session 9 uses Maven `dependency:analyze` when Maven project context is available, but JARScan does not treat that output as absolute truth. Runtime configuration, packaging behavior, and metadata-driven activation can still invalidate a naive removal decision.
-
-## Reflection / Configuration / Runtime Loading Caveats
-
-Even when project files or bytecode are inspected, usage evidence may miss dependencies loaded through:
-
-- reflection
-- service loaders
-- XML, YAML, or properties configuration
-- container-managed injection
-- runtime classpath conventions
-
-## Source Files Are Not Scanned For Application Vulnerabilities
-
-JARScan does not provide general source-code vulnerability scanning. It must not be described or implemented as a scanner for SQL injection, XSS, insecure crypto usage, business-logic flaws, or similar application-security concerns.
-
-## Standalone JARs Without POMs Have Limited Graph Reconstruction
-
-If an uploaded archive lacks embedded Maven metadata or related POM context, JARScan can still inspect packaged contents but may not be able to reconstruct a full dependency graph accurately.
-
-## Dependency Tree Visualization Depends On Maven Tree Output
-
-The Session 7 dependency tree UI only appears when Maven `dependency:tree` output could be captured and parsed from an uploaded `pom.xml` or a project ZIP with a usable root `pom.xml`.
-
-## Version Conflict And Convergence Findings Depend On Tree Fidelity
-
-Session 8 conflict and convergence analysis are only as precise as the parsed Maven tree. When Maven output includes omitted nodes, managed-version hints, or conflict annotations, JARScan can explain more. When that context is missing, findings remain best-effort.
-
-## Duplicate Class Detection Is Bounded
-
-Duplicate class analysis intentionally stops after configurable archive-count and internal entry-count limits so very large scans do not become excessively expensive. A clean run means "no duplicates detected within the scan budget," not an absolute proof for arbitrarily large inputs.
-
-## Duplicate Class Detection Is Archive-Centric
-
-Duplicate-class and split-package findings are derived from the analyzed dependency archive set. They do not reconstruct the exact runtime classpath order for every application server, launcher, shading strategy, or container environment.
-
-## License Analysis Is Best-Effort
-
-License findings rely on evidence such as embedded Maven `pom.xml`, manifest metadata, and `LICENSE`/`NOTICE` files. Some artifacts provide incomplete, conflicting, or missing license data, so unknown and multiple-license results should be reviewed manually.
-
-## License Categories Are Review Aids, Not Legal Advice
-
-Permissive, weak-copyleft, strong-copyleft, commercial, unknown, and multiple classifications are intended to help triage dependency review. They are not legal advice and do not replace a proper license compliance process.
-
-## Project ZIPs Without Compiled Classes Are Less Reliable For Usage Analysis
-
-Future project ZIP analysis may still be helpful, but if compiled classes are absent then bytecode-backed usage evidence becomes weaker and confidence should be reduced.
-
-## Resource And Metadata Hints Are Best-Effort
-
-Configuration files, `META-INF/services`, `spring.factories`, and `AutoConfiguration.imports` can lower confidence for removal suggestions, but they still do not prove every runtime path. They are clues, not guarantees.
-
-## Project ZIPs Without POMs Have Reduced Resolution Fidelity
-
-If a project ZIP does not contain a usable root `pom.xml`, JARScan can still inspect packaged archives and detected library directories, but Maven-backed dependency resolution and dependency-tree output will be unavailable.
-
-## Safe Extraction Limits Can Reject Very Large Project ZIPs
-
-Project ZIP extraction is intentionally bounded by file-count and extracted-size limits. Large monorepos, generated directories, or oversized vendor bundles may be rejected unless limits are raised intentionally.
-
-## WAR/EAR And Fat JAR Inspection Still Has Runtime Blind Spots
-
-Current WAR/EAR/fat JAR inspection now includes duplicate-class analysis against the analyzed archive set, but it still focuses on packaged structure, embedded libraries, metadata, and bytecode versions. It does not fully model runtime container ordering, dynamic class loading, or usage analysis inside those layouts.
-
-## Suggested Exclusions Require Testing
-
-Future outputs such as unused dependency suggestions, slimming advice, or AWS bundle advice should be treated as recommendations that require validation in the user’s build and runtime environment before removal.
-
-## AWS Bundle Advice Has Coverage Limits
-
-The AWS bundle advisor infers likely service usage from bytecode and metadata references that JARScan can see locally. It may miss services activated through reflection, dependency injection, wrappers, generated code, or runtime configuration, so replacement guidance must be reviewed and tested.
+1. Dependency-Check DB freshness
+   Dependency-Check findings depend on the local database state. Cold-start updates can be slow.
+2. Optional NVD API key
+   An NVD API key speeds up updates, but it is optional. If configured, it is stored locally and masked in UI and logs.
+3. Private Maven repositories
+   Private repositories require external Maven credential configuration such as mounted `settings.xml`.
+4. Unused dependency analysis is evidence-based
+   Java dependencies may be activated through reflection, configuration, ServiceLoader, Spring auto-configuration, servlet containers, logging frameworks, JDBC drivers, or runtime plugins.
+5. Not source-code vulnerability scanning
+   JARScan may inspect source files, resources, and bytecode only to reason about dependencies and packaging.
+6. Standalone archives have limited graph reconstruction
+   Without usable POM metadata, full Maven graph reconstruction may not be possible.
+7. Source-only project ZIPs are less reliable
+   If compiled classes are absent, usage analysis falls back to weaker hints.
+8. Suggested exclusions require testing
+   Generated exclusions, narrowing suggestions, and dependencyManagement snippets are recommendations only.
+9. SBOM import limitations
+   Imported SBOM quality depends on the completeness and correctness of the source SBOM.
+10. Policy and suppression conventions for some findings
+   Suppressing policy-only or duplicate-class style findings relies on lightweight matching conventions because those findings are not fully normalized into relational tables.

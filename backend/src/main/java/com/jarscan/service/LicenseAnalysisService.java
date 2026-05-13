@@ -79,7 +79,10 @@ public class LicenseAnalysisService {
                     "NONE",
                     "LOW",
                     "unknown",
-                    List.of("No embedded license metadata was found for this archive.")
+                    List.of("No embedded license metadata was found for this archive."),
+                    false,
+                    null,
+                    null
             );
         }
 
@@ -106,7 +109,10 @@ public class LicenseAnalysisService {
                 primary.source(),
                 primary.confidence(),
                 category,
-                List.copyOf(findingWarnings)
+                List.copyOf(findingWarnings),
+                false,
+                null,
+                null
         );
     }
 

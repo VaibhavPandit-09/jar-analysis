@@ -90,7 +90,10 @@ public class DuplicateClassAnalysisService {
                         List.copyOf(entry.getValue()),
                         entry.getValue().size() > 2 ? "HIGH" : "MEDIUM",
                         "Keep only one provider of this class on the runtime path or exclude the duplicate from one side of the graph.",
-                        "Classpath shadowing can make runtime behavior depend on archive ordering instead of your intended dependency selection."
+                        "Classpath shadowing can make runtime behavior depend on archive ordering instead of your intended dependency selection.",
+                        false,
+                        null,
+                        null
                 )));
 
         packageOwners.entrySet().stream()
@@ -105,7 +108,10 @@ public class DuplicateClassAnalysisService {
                         List.copyOf(entry.getValue()),
                         "LOW",
                         "Review whether this split package layout is intentional, especially if the archives will be combined into one classpath or module path.",
-                        "Split packages raise the chance of classpath ambiguity and can complicate modular Java deployments."
+                        "Split packages raise the chance of classpath ambiguity and can complicate modular Java deployments.",
+                        false,
+                        null,
+                        null
                 )));
 
         findings.addAll(patternFindings(scannable));
@@ -157,7 +163,10 @@ public class DuplicateClassAnalysisService {
                 artifacts.stream().map(this::artifactLabel).distinct().toList(),
                 severity,
                 recommendation,
-                "Mixed providers or version skew can create subtle runtime behavior changes even when the build succeeds."
+                "Mixed providers or version skew can create subtle runtime behavior changes even when the build succeeds.",
+                false,
+                null,
+                null
         );
     }
 

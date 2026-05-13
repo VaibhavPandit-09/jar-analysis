@@ -1,10 +1,12 @@
 import { flexRender, getCoreRowModel, useReactTable } from "@tanstack/react-table";
 import { motion } from "framer-motion";
-import { Download, Search } from "lucide-react";
+import { Download, Search, ShieldBan } from "lucide-react";
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 
 import { DependencyTreePanel, type DependencyTreeFocusRequest, type DependencyVulnerabilitySummary } from "@/components/dependency-tree-panel";
-import { DuplicateClassesPanel, LicensesPanel, SlimmingAdvisorPanel, UsageAnalysisPanel, VersionConflictsPanel } from "@/components/insights-panels";
+import { DuplicateClassesPanel, LicensesPanel, PolicyResultsPanel, SlimmingAdvisorPanel, UsageAnalysisPanel, VersionConflictsPanel } from "@/components/insights-panels";
+import { SuppressionDialog } from "@/components/suppression-dialog";
 import {
   Accordion,
   AccordionContent,
@@ -15,8 +17,9 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { buildJobExportUrl } from "@/lib/api";
+import { buildJobExportUrl, buildScanExportUrl, createSuppression } from "@/lib/api";
 import { buildDependencyTreeIndex, dependencyCoordinateKey, dependencyKey } from "@/lib/dependency-tree";
+import type { SuppressionDraft } from "@/lib/suppressions";
 import type {
   AnalysisResult,
   ArtifactAnalysis,
@@ -188,12 +191,19 @@ function FatJarInspectorTab({ artifact }: { artifact: ArtifactAnalysis }) {
 function VulnerabilityTable({
   rows,
   onShowPath,
+  onSuppress,
 }: {
   rows: VulnerabilityFinding[];
   onShowPath?: (() => void) | null;
+  onSuppress?: ((finding: VulnerabilityFinding) => void) | null;
 }) {
+  const [showSuppressed, setShowSuppressed] = useState(false);
+  const visibleRows = useMemo(
+    () => (showSuppressed ? rows : rows.filter((row) => !row.suppressed)),
+    [rows, showSuppressed],
+  );
   const table = useReactTable({
-    data: rows,
+    data: visibleRows,
     columns: [
       {
         header: "Severity",
@@ -231,12 +241,30 @@ function VulnerabilityTable({
           </button>
         ) : <span className="text-muted-foreground">n/a</span>,
       },
+      {
+        header: "Actions",
+        cell: ({ row }) => row.original.suppressed ? (
+          <div className="text-xs text-sky-700 dark:text-sky-200">
+            Suppressed{row.original.suppressionReason ? `: ${row.original.suppressionReason}` : ""}
+          </div>
+        ) : onSuppress ? (
+          <button type="button" className="inline-flex items-center text-sm font-medium text-primary hover:underline" onClick={() => onSuppress(row.original)}>
+            <ShieldBan className="mr-1 h-4 w-4" /> Suppress
+          </button>
+        ) : <span className="text-muted-foreground">n/a</span>,
+      },
     ],
     getCoreRowModel: getCoreRowModel(),
   });
 
   return (
-    <div className="overflow-hidden rounded-3xl border border-border/70">
+    <div className="space-y-3">
+      <div className="flex justify-end">
+        <button type="button" className="text-sm font-medium text-primary hover:underline" onClick={() => setShowSuppressed((current) => !current)}>
+          {showSuppressed ? "Hide suppressed findings" : `Show suppressed findings (${rows.filter((row) => row.suppressed).length})`}
+        </button>
+      </div>
+      <div className="overflow-hidden rounded-3xl border border-border/70">
       <table className="min-w-full divide-y divide-border/70 text-sm">
         <thead className="bg-secondary/60 text-left">
           {table.getHeaderGroups().map((group) => (
@@ -261,6 +289,7 @@ function VulnerabilityTable({
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }
@@ -269,13 +298,16 @@ interface ResultsDashboardProps {
   result: AnalysisResult;
   exportJobId?: string;
   sourceLabel?: string;
+  scanId?: string;
+  onRefresh?: () => Promise<void> | void;
 }
 
-export function ResultsDashboard({ result, exportJobId, sourceLabel }: ResultsDashboardProps) {
+export function ResultsDashboard({ result, exportJobId, sourceLabel, scanId, onRefresh }: ResultsDashboardProps) {
   const [query, setQuery] = useState("");
   const [severityFilter, setSeverityFilter] = useState<Severity | "ALL">("ALL");
-  const [activeResultsTab, setActiveResultsTab] = useState<"artifacts" | "dependency-tree" | "version-conflicts" | "duplicate-classes" | "licenses" | "usage-analysis" | "slimming-advisor">("artifacts");
+  const [activeResultsTab, setActiveResultsTab] = useState<"artifacts" | "dependency-tree" | "version-conflicts" | "duplicate-classes" | "licenses" | "usage-analysis" | "slimming-advisor" | "policy-results" | "exports">("artifacts");
   const [dependencyTreeFocus, setDependencyTreeFocus] = useState<DependencyTreeFocusRequest | null>(null);
+  const [suppressionDraft, setSuppressionDraft] = useState<SuppressionDraft | null>(null);
 
   const allArtifacts = useMemo(() => flattenArtifacts(result.artifacts), [result.artifacts]);
   const dependencyTreeIndex = useMemo(() => buildDependencyTreeIndex(result.dependencyTree), [result.dependencyTree]);
@@ -322,10 +354,13 @@ export function ResultsDashboard({ result, exportJobId, sourceLabel }: ResultsDa
         ["JSON", "json"],
         ["Markdown", "markdown"],
         ["HTML", "html"],
+        ...(scanId ? [["CycloneDX JSON", "cyclonedx-json"]] : []),
       ].map(([label, format]) => ({
         label,
-        href: buildJobExportUrl(exportJobId, format as "json" | "markdown" | "html"),
-        extension: format === "markdown" ? "md" : format,
+        href: scanId
+          ? buildScanExportUrl(scanId, format as "json" | "markdown" | "html" | "cyclonedx-json")
+          : buildJobExportUrl(exportJobId, format as "json" | "markdown" | "html"),
+        extension: format === "markdown" ? "md" : format === "cyclonedx-json" ? "cdx.json" : format,
       }))
     : [];
 
@@ -416,15 +451,32 @@ export function ResultsDashboard({ result, exportJobId, sourceLabel }: ResultsDa
         ))}
       </section>
 
-      <Tabs value={activeResultsTab} onValueChange={(value) => setActiveResultsTab(value as "artifacts" | "dependency-tree" | "version-conflicts" | "duplicate-classes" | "licenses" | "usage-analysis" | "slimming-advisor")}>
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {[
+          ["Policy warnings", result.summary.policyWarningCount],
+          ["Policy failures", result.summary.policyFailureCount],
+          ["Overall policy", result.summary.overallPolicyStatus ?? "n/a"],
+        ].map(([label, value]) => (
+          <Card key={String(label)}>
+            <CardContent className="p-5">
+              <div className="text-sm text-muted-foreground">{label}</div>
+              <div className="mt-2 font-display text-3xl font-semibold tracking-tight">{value}</div>
+            </CardContent>
+          </Card>
+        ))}
+      </section>
+
+      <Tabs value={activeResultsTab} onValueChange={(value) => setActiveResultsTab(value as "artifacts" | "dependency-tree" | "version-conflicts" | "duplicate-classes" | "licenses" | "usage-analysis" | "slimming-advisor" | "policy-results" | "exports")}>
         <TabsList>
           <TabsTrigger value="artifacts">Artifacts</TabsTrigger>
           <TabsTrigger value="dependency-tree">Dependency Tree</TabsTrigger>
+          <TabsTrigger value="usage-analysis">Usage Analysis</TabsTrigger>
+          <TabsTrigger value="slimming-advisor">Slimming Advisor</TabsTrigger>
           <TabsTrigger value="version-conflicts">Version Conflicts</TabsTrigger>
           <TabsTrigger value="duplicate-classes">Duplicate Classes</TabsTrigger>
           <TabsTrigger value="licenses">Licenses</TabsTrigger>
-          <TabsTrigger value="usage-analysis">Usage Analysis</TabsTrigger>
-          <TabsTrigger value="slimming-advisor">Slimming Advisor</TabsTrigger>
+          <TabsTrigger value="policy-results">Policy Results</TabsTrigger>
+          <TabsTrigger value="exports">Exports</TabsTrigger>
         </TabsList>
 
         <TabsContent value="artifacts">
@@ -589,6 +641,18 @@ export function ResultsDashboard({ result, exportJobId, sourceLabel }: ResultsDa
                             <VulnerabilityTable
                               rows={artifact.vulnerabilities}
                               onShowPath={pathAvailable ? () => focusDependencyInTree(artifact.coordinates) : null}
+                              onSuppress={scanId ? (finding) => setSuppressionDraft({
+                                title: "Suppress vulnerability finding",
+                                description: "Keep the raw vulnerability record, but hide it from the default review surface until the suppression is removed or expires.",
+                                targetLabel: `${artifact.coordinates.groupId ?? "unknown"}:${artifact.coordinates.artifactId ?? "unknown"}:${finding.cveId ?? finding.packageName ?? "vulnerability"}`,
+                                payload: {
+                                  type: "VULNERABILITY",
+                                  groupId: artifact.coordinates.groupId,
+                                  artifactId: artifact.coordinates.artifactId,
+                                  version: artifact.coordinates.version ?? finding.installedVersion,
+                                  cveId: finding.cveId,
+                                },
+                              }) : null}
                             />
                           </TabsContent>
 
@@ -644,6 +708,7 @@ export function ResultsDashboard({ result, exportJobId, sourceLabel }: ResultsDa
             <VersionConflictsPanel
               versionConflicts={result.versionConflicts}
               convergenceFindings={result.convergenceFindings}
+              onSuppress={scanId ? setSuppressionDraft : undefined}
             />
           ) : (
             <Card>
@@ -658,21 +723,71 @@ export function ResultsDashboard({ result, exportJobId, sourceLabel }: ResultsDa
         </TabsContent>
 
         <TabsContent value="duplicate-classes">
-          <DuplicateClassesPanel findings={result.duplicateClasses} />
+          <DuplicateClassesPanel findings={result.duplicateClasses} onSuppress={scanId ? setSuppressionDraft : undefined} />
         </TabsContent>
 
         <TabsContent value="licenses">
-          <LicensesPanel licenses={result.licenses} />
+          <LicensesPanel licenses={result.licenses} onSuppress={scanId ? setSuppressionDraft : undefined} />
         </TabsContent>
 
         <TabsContent value="usage-analysis">
-          <UsageAnalysisPanel findings={result.dependencyUsage} />
+          <UsageAnalysisPanel findings={result.dependencyUsage} onSuppress={scanId ? setSuppressionDraft : undefined} />
         </TabsContent>
 
         <TabsContent value="slimming-advisor">
           <SlimmingAdvisorPanel opportunities={result.slimmingOpportunities} awsBundleAdvice={result.awsBundleAdvice} />
         </TabsContent>
+
+        <TabsContent value="policy-results">
+          <PolicyResultsPanel evaluation={result.policyEvaluation ?? null} onSuppress={scanId ? setSuppressionDraft : undefined} />
+        </TabsContent>
+
+        <TabsContent value="exports">
+          <Card>
+            <CardHeader>
+              <CardTitle>Exports</CardTitle>
+              <CardDescription>
+                Export the current result in JSON, Markdown, HTML, or CycloneDX JSON where supported.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-wrap gap-3">
+              {exportLinks.length > 0 ? exportLinks.map((link) => (
+                <a
+                  key={link.label}
+                  href={link.href}
+                  download={`jarscan-${scanId ?? exportJobId}.${link.extension}`}
+                  className={cn(buttonVariants({ variant: "outline" }))}
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  Export {link.label}
+                </a>
+              )) : (
+                <div className="rounded-3xl border border-border/70 bg-background/70 px-4 py-5 text-sm text-muted-foreground">
+                  Export links are unavailable for this result.
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
+
+      <SuppressionDialog
+        open={Boolean(suppressionDraft)}
+        title={suppressionDraft?.title ?? ""}
+        description={suppressionDraft?.description ?? ""}
+        targetLabel={suppressionDraft?.targetLabel ?? ""}
+        initialPayload={suppressionDraft?.payload ?? { type: "DEPENDENCY" }}
+        onClose={() => setSuppressionDraft(null)}
+        onSubmit={async (payload) => {
+          if (!scanId) {
+            toast.error("Suppressions are only available for persisted scans.");
+            return;
+          }
+          await createSuppression(payload);
+          toast.success("Suppression created");
+          await onRefresh?.();
+        }}
+      />
     </motion.div>
   );
 }

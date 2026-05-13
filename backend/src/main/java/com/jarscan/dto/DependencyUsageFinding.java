@@ -1,5 +1,6 @@
 package com.jarscan.dto;
 
+import java.time.Instant;
 import java.util.List;
 
 public record DependencyUsageFinding(
@@ -13,6 +14,9 @@ public record DependencyUsageFinding(
         String suggestedAction,
         List<List<String>> paths,
         Long sizeBytes,
-        Integer vulnerabilitiesContributed
+        Integer vulnerabilitiesContributed,
+        boolean suppressed,
+        String suppressionReason,
+        Instant suppressionExpiresAt
 ) {
 }

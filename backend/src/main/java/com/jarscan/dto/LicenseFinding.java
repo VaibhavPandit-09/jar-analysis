@@ -1,5 +1,6 @@
 package com.jarscan.dto;
 
+import java.time.Instant;
 import java.util.List;
 
 public record LicenseFinding(
@@ -11,6 +12,9 @@ public record LicenseFinding(
         String source,
         String confidence,
         String category,
-        List<String> warnings
+        List<String> warnings,
+        boolean suppressed,
+        String suppressionReason,
+        Instant suppressionExpiresAt
 ) {
 }

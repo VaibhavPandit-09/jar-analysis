@@ -85,7 +85,10 @@ public class DependencyConflictAnalysisService {
                         immutablePaths(pathsByVersion),
                         resolvedVersion,
                         "Align all incoming paths to a single version so the graph converges cleanly across modules and packaging styles.",
-                        dependencyManagementSnippet(representative.groupId(), representative.artifactId(), resolvedVersion)
+                        dependencyManagementSnippet(representative.groupId(), representative.artifactId(), resolvedVersion),
+                        false,
+                        null,
+                        null
                 ));
             }
 
@@ -99,7 +102,10 @@ public class DependencyConflictAnalysisService {
                         conflictType(hasManagedOverride, hasConflict, hasDuplicate, nearestWins),
                         riskLevel(requestedVersions, hasConflict, nearestWins, observations),
                         recommendation(hasManagedOverride, hasConflict, hasDuplicate, nearestWins),
-                        dependencyManagementSnippet(representative.groupId(), representative.artifactId(), resolvedVersion)
+                        dependencyManagementSnippet(representative.groupId(), representative.artifactId(), resolvedVersion),
+                        false,
+                        null,
+                        null
                 ));
             }
         }

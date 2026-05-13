@@ -133,6 +133,9 @@ public class DependencyUsageAnalysisService {
                         "Declare this dependency explicitly in Maven and verify that the build no longer relies on transitive leakage.",
                         findPaths(dependencyTree, dependencyKey),
                         null,
+                        null,
+                        false,
+                        null,
                         null
                 ));
             }
@@ -175,6 +178,7 @@ public class DependencyUsageAnalysisService {
                 case POM -> true;
                 case PROJECT_ZIP -> fromResolvedArtifacts || packagedDependency;
                 case ARCHIVE_UPLOAD -> packagedDependency;
+                case SBOM -> false;
             };
             if (!include) {
                 continue;
@@ -442,7 +446,10 @@ public class DependencyUsageAnalysisService {
                 suggestedAction(status),
                 candidate.paths() == null ? List.of() : candidate.paths(),
                 candidate.artifact().sizeBytes(),
-                candidate.artifact().vulnerabilityCount()
+                candidate.artifact().vulnerabilityCount(),
+                false,
+                null,
+                null
         );
     }
 

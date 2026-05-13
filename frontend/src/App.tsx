@@ -7,6 +7,8 @@ import { ScanHistoryPage } from "@/pages/scan-history-page";
 import { SettingsPage } from "@/pages/settings-page";
 import { UploadPage } from "@/pages/upload-page";
 import { ComparePage } from "@/pages/compare-page";
+import { SuppressionsPage } from "@/pages/suppressions-page";
+import { PoliciesPage } from "@/pages/policies-page";
 
 const router = createBrowserRouter([
   {
@@ -17,6 +19,8 @@ const router = createBrowserRouter([
       { path: "scan-history", element: <ScanHistoryPage /> },
       { path: "compare", element: <ComparePage /> },
       { path: "settings", element: <SettingsPage /> },
+      { path: "suppressions", element: <SuppressionsPage /> },
+      { path: "policies", element: <PoliciesPage /> },
       { path: "jobs/:jobId", element: <JobProgressPage /> },
       { path: "jobs/:jobId/results", element: <ResultsPage /> },
       { path: "scans/:scanId/results", element: <ResultsPage /> },

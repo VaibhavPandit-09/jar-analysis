@@ -62,6 +62,8 @@ public class AnalysisJobService {
     private final LicenseAnalysisService licenseAnalysisService;
     private final DependencyUsageAnalysisService dependencyUsageAnalysisService;
     private final DependencySlimmingAdvisorService dependencySlimmingAdvisorService;
+    private final ScanResultViewService scanResultViewService;
+    private final PolicyService policyService;
 
     public AnalysisJobService(
             ExecutorService analysisExecutor,
@@ -76,7 +78,9 @@ public class AnalysisJobService {
             DuplicateClassAnalysisService duplicateClassAnalysisService,
             LicenseAnalysisService licenseAnalysisService,
             DependencyUsageAnalysisService dependencyUsageAnalysisService,
-            DependencySlimmingAdvisorService dependencySlimmingAdvisorService
+            DependencySlimmingAdvisorService dependencySlimmingAdvisorService,
+            ScanResultViewService scanResultViewService,
+            PolicyService policyService
     ) {
         this.analysisExecutor = analysisExecutor;
         this.progressEventService = progressEventService;
@@ -91,6 +95,8 @@ public class AnalysisJobService {
         this.licenseAnalysisService = licenseAnalysisService;
         this.dependencyUsageAnalysisService = dependencyUsageAnalysisService;
         this.dependencySlimmingAdvisorService = dependencySlimmingAdvisorService;
+        this.scanResultViewService = scanResultViewService;
+        this.policyService = policyService;
     }
 
     public AnalysisJobResponse createJob(List<MultipartFile> files) {
@@ -134,7 +140,7 @@ public class AnalysisJobService {
     public AnalysisResult getResult(String jobId) {
         AnalysisJob job = jobs.get(jobId);
         if (job != null && job.result() != null) {
-            return job.result();
+            return scanResultViewService.decorate(job.result());
         }
         return scanHistoryService.findResultByJobId(jobId)
                 .orElseThrow(() -> new ResponseStatusException(
@@ -298,7 +304,8 @@ public class AnalysisJobService {
                             licenseFindings,
                             dependencyUsageFindings,
                             slimmingOpportunities,
-                            awsBundleAdvice
+                            awsBundleAdvice,
+                            null
                     ),
                     artifacts,
                     dependencyTree,
@@ -309,12 +316,13 @@ public class AnalysisJobService {
                     dependencyUsageFindings,
                     slimmingOpportunities,
                     awsBundleAdvice,
+                    null,
                     dependencyTreeText,
                     List.copyOf(job.warnings()),
                     List.copyOf(job.errors()),
                     projectStructure
             );
-            job.result(result);
+            job.result(policyService.applyPolicies(result));
             job.status(JobStatus.COMPLETED);
             job.completedAt(result.completedAt());
             job.message("Completed");

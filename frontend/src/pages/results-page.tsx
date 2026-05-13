@@ -4,7 +4,7 @@ import { toast } from "sonner";
 
 import { ResultsDashboard } from "@/components/results-dashboard";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { fetchJobResult, fetchStoredScan } from "@/lib/api";
+import { fetchJobResult, fetchStoredScan, fetchStoredScanByJob } from "@/lib/api";
 import type { AnalysisResult, StoredScanSummary } from "@/lib/types";
 
 function ResultsSkeleton() {
@@ -54,10 +54,18 @@ export function ResultsPage() {
         }
 
         if (jobId) {
-          const nextResult = await fetchJobResult(jobId);
-          if (cancelled) return;
-          setScanSummary(null);
-          setResult(nextResult);
+          try {
+            const stored = await fetchStoredScanByJob(jobId);
+            if (cancelled) return;
+            setScanSummary(stored.summary);
+            setResult(stored.result);
+            return;
+          } catch {
+            const nextResult = await fetchJobResult(jobId);
+            if (cancelled) return;
+            setScanSummary(null);
+            setResult(nextResult);
+          }
         }
       } catch (error) {
         if (!cancelled) {
@@ -101,5 +109,25 @@ export function ResultsPage() {
     ? `Reopened from persisted scan history for ${scanSummary.inputName ?? scanSummary.jobId}`
     : undefined;
 
-  return <ResultsDashboard result={result} exportJobId={exportJobId} sourceLabel={sourceLabel} />;
+  return (
+    <ResultsDashboard
+      result={result}
+      exportJobId={exportJobId}
+      sourceLabel={sourceLabel}
+      scanId={scanSummary?.scanId}
+      onRefresh={async () => {
+        if (scanSummary?.scanId) {
+          const stored = await fetchStoredScan(scanSummary.scanId);
+          setScanSummary(stored.summary);
+          setResult(stored.result);
+          return;
+        }
+        if (jobId) {
+          const stored = await fetchStoredScanByJob(jobId);
+          setScanSummary(stored.summary);
+          setResult(stored.result);
+        }
+      }}
+    />
+  );
 }

@@ -11,9 +11,11 @@ const ACCEPTED = {
   "application/java-archive": [".jar"],
   "application/zip": [".zip"],
   "application/x-zip-compressed": [".zip"],
+  "application/json": [".json", ".cdx.json", ".bom.json"],
   "application/xml": [".xml"],
   "text/xml": [".xml"],
-  "application/octet-stream": [".jar", ".war", ".ear", ".zip"],
+  "text/plain": [".json", ".cdx.json", ".bom.json"],
+  "application/octet-stream": [".jar", ".war", ".ear", ".zip", ".json", ".cdx.json", ".bom.json"],
 };
 
 interface UploadZoneProps {
@@ -53,7 +55,7 @@ export function UploadZone({
             <CardTitle>Drop Java archives, a Maven descriptor, or a project ZIP</CardTitle>
             <CardDescription>
               Archive mode accepts JAR/WAR/EAR files, POM mode accepts one <code>pom.xml</code>, and Project mode accepts one
-              source or build ZIP for safe extraction and best-effort structure detection.
+              source or build ZIP for safe extraction and best-effort structure detection. CycloneDX JSON SBOMs can be imported directly into scan history.
             </CardDescription>
           </div>
           <Badge variant="info" className="hidden sm:inline-flex">
@@ -88,7 +90,7 @@ export function UploadZone({
 
             <div className="flex flex-wrap items-center justify-center gap-3">
               <Button onClick={open}>Browse files</Button>
-              <Badge variant="neutral">Accepts `.jar`, `.war`, `.ear`, `.zip`, and `pom.xml`</Badge>
+              <Badge variant="neutral">Accepts `.jar`, `.war`, `.ear`, `.zip`, `pom.xml`, and CycloneDX `.json`</Badge>
             </div>
           </div>
         </div>
@@ -98,6 +100,7 @@ export function UploadZone({
             "Archive mode: upload one or more JAR/WAR/EAR files",
             "POM mode: upload one pom.xml for Maven dependency resolution",
             "Project mode: upload one ZIP for safe extraction and structure detection",
+            "SBOM mode: import one CycloneDX JSON file into scan history",
           ].map((hint) => (
             <div key={hint} className="rounded-2xl border border-border/70 bg-secondary/40 px-4 py-3 text-sm text-muted-foreground">
               {hint}
@@ -120,7 +123,7 @@ export function UploadZone({
               </p>
             </div>
             <Button onClick={onAnalyze} disabled={!files.length || analyzing}>
-              {analyzing ? "Starting..." : "Start analysis"}
+              {analyzing ? "Starting..." : files.some((file) => file.name.toLowerCase().endsWith(".json")) ? "Import SBOM" : "Start analysis"}
             </Button>
           </div>
 
@@ -139,7 +142,9 @@ export function UploadZone({
 
               {files.map((file) => {
                 const isPom = file.name.toLowerCase() === "pom.xml";
-                const isZip = file.name.toLowerCase().endsWith(".zip");
+                const lowerName = file.name.toLowerCase();
+                const isZip = lowerName.endsWith(".zip");
+                const isSbom = lowerName.endsWith(".json") || lowerName.endsWith(".cdx.json") || lowerName.endsWith(".bom.json");
                 return (
                   <motion.div
                     key={`${file.name}-${file.size}`}
@@ -155,7 +160,7 @@ export function UploadZone({
                       <div className="min-w-0">
                         <div className="truncate font-medium text-foreground">{file.name}</div>
                         <div className="text-sm text-muted-foreground">
-                          {(file.size / 1024 / 1024).toFixed(2)} MB {isZip ? "• Project ZIP" : isPom ? "• POM mode" : "• Archive mode"}
+                          {(file.size / 1024 / 1024).toFixed(2)} MB {isSbom ? "• SBOM import" : isZip ? "• Project ZIP" : isPom ? "• POM mode" : "• Archive mode"}
                         </div>
                       </div>
                     </div>

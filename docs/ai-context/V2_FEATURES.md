@@ -1,134 +1,48 @@
 # V2 Features
 
-This file documents the planned JARScan v2 feature set. These items are roadmap targets, not guarantees that every detail already exists in code.
+## Completed v2 Scope
 
-## Persistent Scan History
+v2 now includes:
+- persistent scan history in SQLite
+- reopenable results
+- scan comparison
+- NVD API key management
+- vulnerability DB status and manual sync
+- project ZIP upload and safe extraction
+- WAR/EAR deep inspection
+- fat JAR inspector
+- Maven dependency tree parsing
+- dependency tree visualization
+- path-to-dependency view
+- version conflict analysis
+- dependency convergence analysis
+- duplicate class detection
+- split-package detection
+- license analysis
+- evidence-based dependency usage analysis
+- dependency slimming advisor
+- AWS bundle advisor
+- suppressions
+- policy engine
+- CycloneDX JSON SBOM import/export
+- final UI polish for key v2 pages
 
-- local SQLite-backed scan history
-- reopen prior scan results without rescanning
-- metadata-driven history list
-- implemented across Sessions 2 and 3
+## Feature Notes
 
-## NVD API Key Support
+### Dependency Tree
+- JSON-first tree capture with text fallback
+- search/filter/highlight support in the UI
 
-- optional local configuration of NVD API key
-- better Dependency-Check update throughput when configured
+### Usage Analysis
+- confidence-based
+- combines Maven, bytecode, resources, ServiceLoader, Spring metadata, and heuristics
 
-## Dependency-Check DB Status And Sync UI
+### Policies
+- stored in SQLite
+- reevaluated for reopened scans
+- support enable/disable and simple config editing
 
-- visible DB health/status
-- last-updated timestamp
-- manual sync action
-- background progress feedback
-
-## Project ZIP Support
-
-- upload project ZIPs
-- safely extract project ZIPs with bounded limits
-- inspect Maven project structure where practical
-- detect root POMs, packaged archives, compiled classes, Spring metadata, and ServiceLoader metadata
-
-## WAR/EAR Intelligence
-
-- deeper inspection of `WEB-INF/lib`, application libs, and related packaging layouts
-- better bundled-dependency understanding
-- WAR summaries for `WEB-INF/classes`, `WEB-INF/lib`, `web.xml`, config files, and Java version hints
-- EAR summaries for `application.xml`, WAR/JAR modules, lib archives, and nested dependency structure
-
-## Dependency Tree Visualization
-
-- parsed Maven dependency tree
-- structured hierarchical display with expand/collapse controls
-- search, scope filtering, and direct/transitive filtering
-- conflict and omitted-node highlighting where Maven output exposes that context
-- implemented in Session 7
-
-## Path-To-Dependency
-
-- explain why a dependency is present
-- show transitive path(s) from root dependency to target dependency
-- implemented in Session 7 through per-node `pathFromRoot` data and dependency-tree side-panel drill-down
-
-## Version Conflict Analysis
-
-- surface competing versions in the graph
-- explain which version won and where mismatches exist
-- generate copyable `dependencyManagement` snippets for review
-- implemented in Session 8
-
-## Dependency Convergence
-
-- identify graphs that do not converge cleanly
-- surface risky or inconsistent transitive version patterns
-- implemented in Session 8 from the parsed dependency tree
-
-## Unused Dependency Analysis
-
-- detect apparently unused dependencies
-- differentiate confidence levels instead of hard yes/no judgments
-- implemented in Session 9 with evidence, warnings, and suggested actions
-
-## Dependency Slimming Advisor
-
-- suggest candidates for removal or scope reduction
-- highlight oversized or redundant dependency sets
-- implemented in Session 9 with exclusion and replacement snippets where practical
-
-## AWS Bundle Advisor
-
-- special guidance for large AWS SDK dependency footprints
-- help identify opportunities to slim AWS-related dependency bundles
-- implemented in Session 9 with bytecode-backed service-module hints and replacement guidance
-
-## Suppression System
-
-- local suppression rules for acknowledged findings
-- persistent storage for suppressions
-
-## SBOM Import / Export
-
-- export scan data as SBOM-related outputs
-- import external SBOM data where practical
-
-## License Analysis
-
-- surface license information for dependencies
-- support dependency review and compliance awareness
-- classify common licenses into permissive, weak copyleft, strong copyleft, commercial, unknown, or multiple
-- implemented in Session 8 with best-effort embedded-POM and archive evidence
-
-## Duplicate Class Detection
-
-- detect same class appearing in multiple bundled dependencies
-- help diagnose classpath collision risk
-- optionally surface split packages and common multi-provider collision patterns
-- implemented in Session 8 with bounded archive scanning
-
-## Fat JAR Inspector
-
-- richer inspection of bundled dependencies in application archives
-- better nested-library UX
-- Spring Boot executable JAR detection, boot manifest fields, `layers.idx`, `classpath.idx`, and nested library summaries
-
-## Policy Engine
-
-- local rules such as severity thresholds, banned licenses, or banned dependencies
-- scan pass/fail style policy reporting
-
-## Scan Comparison
-
-- compare two persisted scans
-- highlight before/after dependency additions/removals/updates and unchanged entries
-- highlight vulnerability deltas including new, fixed, changed severity/CVSS, and unchanged findings
-
-## UI Upgrades
-
-- scan history page
-- old scan reopening through the same results dashboard
-- delete confirmation and lightweight notes/tags editing
-- comparison views
-- richer results navigation
-- settings surfaces
-- dependency tree and drill-down views
-- version conflict, duplicate class, and license review tabs
-- usage analysis and slimming advisor tabs
+### Suppressions
+- stored in SQLite
+- do not delete raw findings
+- include reason and optional expiry

@@ -1,5 +1,6 @@
 package com.jarscan.dto;
 
+import java.time.Instant;
 import java.util.List;
 
 public record DuplicateClassFinding(
@@ -9,6 +10,9 @@ public record DuplicateClassFinding(
         List<String> artifacts,
         String severity,
         String recommendation,
-        String shadowingWarning
+        String shadowingWarning,
+        boolean suppressed,
+        String suppressionReason,
+        Instant suppressionExpiresAt
 ) {
 }

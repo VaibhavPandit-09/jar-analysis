@@ -1,27 +1,79 @@
-import { Copy, Layers3, Scale, TrendingDown } from "lucide-react";
+import { Copy, Layers3, Scale, ShieldBan, TrendingDown } from "lucide-react";
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import type { SuppressionDraft } from "@/lib/suppressions";
 import type {
   AwsBundleAdvice,
   ConvergenceFinding,
   DependencyUsageFinding,
   DuplicateClassFinding,
   LicenseFinding,
+  PolicyEvaluation,
   SlimmingOpportunity,
   VersionConflictFinding,
 } from "@/lib/types";
 
+function SectionHeader({
+  title,
+  description,
+  showSuppressed,
+  setShowSuppressed,
+  suppressedCount,
+}: {
+  title: string;
+  description: string;
+  showSuppressed?: boolean;
+  setShowSuppressed?: (value: boolean) => void;
+  suppressedCount?: number;
+}) {
+  return (
+    <Card>
+      <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <CardTitle>{title}</CardTitle>
+          <CardDescription>{description}</CardDescription>
+        </div>
+        {typeof showSuppressed === "boolean" && setShowSuppressed ? (
+          <Button variant="outline" size="sm" onClick={() => setShowSuppressed(!showSuppressed)}>
+            {showSuppressed ? "Hide suppressed" : `Show suppressed${suppressedCount ? ` (${suppressedCount})` : ""}`}
+          </Button>
+        ) : null}
+      </CardHeader>
+    </Card>
+  );
+}
+
+function filterSuppressed<T extends { suppressed?: boolean }>(items: T[], showSuppressed: boolean) {
+  return showSuppressed ? items : items.filter((item) => !item.suppressed);
+}
+
+function SuppressionNotice({ reason, expiresAt }: { reason: string | null; expiresAt: string | null }) {
+  return (
+    <div className="rounded-2xl border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-sm text-sky-900 dark:text-sky-100">
+      Suppressed{reason ? `: ${reason}` : ""}{expiresAt ? ` (expires ${new Date(expiresAt).toLocaleDateString()})` : ""}
+    </div>
+  );
+}
+
 export function VersionConflictsPanel({
   versionConflicts,
   convergenceFindings,
+  onSuppress,
 }: {
   versionConflicts: VersionConflictFinding[];
   convergenceFindings: ConvergenceFinding[];
+  onSuppress?: (draft: SuppressionDraft) => void;
 }) {
-  if (versionConflicts.length === 0 && convergenceFindings.length === 0) {
+  const [showSuppressed, setShowSuppressed] = useState(false);
+  const visibleConflicts = filterSuppressed(versionConflicts, showSuppressed);
+  const visibleConvergence = filterSuppressed(convergenceFindings, showSuppressed);
+  const suppressedCount = versionConflicts.filter((item) => item.suppressed).length + convergenceFindings.filter((item) => item.suppressed).length;
+
+  if (visibleConflicts.length === 0 && visibleConvergence.length === 0 && suppressedCount === 0) {
     return (
       <Card>
         <CardHeader>
@@ -34,27 +86,49 @@ export function VersionConflictsPanel({
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Version conflicts</CardTitle>
-          <CardDescription>
-            These findings come from the parsed Maven dependency tree. They show where multiple versions were requested, which version won, and a dependencyManagement snippet you can copy into a POM review if you want to pin the selected version explicitly.
-          </CardDescription>
-        </CardHeader>
-      </Card>
+      <SectionHeader
+        title="Version conflicts"
+        description="These findings come from the parsed Maven dependency tree. They show where multiple versions were requested, which version won, and a dependencyManagement snippet you can copy into a POM review if you want to pin the selected version explicitly."
+        showSuppressed={showSuppressed}
+        setShowSuppressed={setShowSuppressed}
+        suppressedCount={suppressedCount}
+      />
 
       <div className="space-y-4">
-        {versionConflicts.map((conflict) => (
-          <Card key={`${conflict.groupId}:${conflict.artifactId}`}>
+        {visibleConflicts.map((conflict) => (
+          <Card key={`${conflict.groupId}:${conflict.artifactId}`} className={conflict.suppressed ? "border-sky-500/40" : undefined}>
             <CardContent className="space-y-5 p-6">
-              <div className="flex flex-wrap items-center gap-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <div className="text-lg font-semibold">{conflict.groupId}:{conflict.artifactId}</div>
                   <div className="text-sm text-muted-foreground">Resolved version: {conflict.resolvedVersion ?? "unknown"}</div>
                 </div>
-                <Badge variant={riskVariant(conflict.riskLevel)}>{conflict.riskLevel} risk</Badge>
-                <Badge variant="neutral">{conflict.conflictType}</Badge>
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant={riskVariant(conflict.riskLevel)}>{conflict.riskLevel} risk</Badge>
+                  <Badge variant="neutral">{conflict.conflictType}</Badge>
+                  {onSuppress && !conflict.suppressed ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onSuppress({
+                        title: "Suppress version conflict",
+                        description: "Keep the raw conflict finding, but hide it from normal review surfaces until the suppression expires or is removed.",
+                        targetLabel: `${conflict.groupId}:${conflict.artifactId}`,
+                        payload: {
+                          type: "VERSION_CONFLICT",
+                          groupId: conflict.groupId,
+                          artifactId: conflict.artifactId,
+                          version: conflict.resolvedVersion,
+                        },
+                      })}
+                    >
+                      <ShieldBan className="mr-2 h-4 w-4" /> Suppress
+                    </Button>
+                  ) : null}
+                </div>
               </div>
+
+              {conflict.suppressed ? <SuppressionNotice reason={conflict.suppressionReason ?? null} expiresAt={conflict.suppressionExpiresAt ?? null} /> : null}
 
               <div className="grid gap-4 lg:grid-cols-2">
                 <InfoBlock title="Requested versions">{conflict.requestedVersions.join(", ")}</InfoBlock>
@@ -101,15 +175,41 @@ export function VersionConflictsPanel({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {convergenceFindings.map((finding) => (
+          {visibleConvergence.length === 0 ? (
+            <div className="rounded-3xl border border-border/70 bg-background/70 px-4 py-4 text-sm text-muted-foreground">
+              No convergence findings matched the current suppression filter.
+            </div>
+          ) : visibleConvergence.map((finding) => (
             <div key={`${finding.groupId}:${finding.artifactId}`} className="rounded-3xl border border-border/70 bg-background/70 px-4 py-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="font-medium">{finding.groupId}:{finding.artifactId}</div>
-                <Badge variant="medium">selected {finding.selectedVersion ?? "unknown"}</Badge>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="font-medium">{finding.groupId}:{finding.artifactId}</div>
+                  <Badge variant="medium">selected {finding.selectedVersion ?? "unknown"}</Badge>
+                </div>
+                {onSuppress && !finding.suppressed ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onSuppress({
+                      title: "Suppress convergence finding",
+                      description: "Keep the raw convergence issue, but hide it from the main review surface while the suppression remains active.",
+                      targetLabel: `${finding.groupId}:${finding.artifactId}`,
+                      payload: {
+                        type: "VERSION_CONFLICT",
+                        groupId: finding.groupId,
+                        artifactId: finding.artifactId,
+                        version: finding.selectedVersion,
+                      },
+                    })}
+                  >
+                    <ShieldBan className="mr-2 h-4 w-4" /> Suppress
+                  </Button>
+                ) : null}
               </div>
+              {finding.suppressed ? <div className="mt-3"><SuppressionNotice reason={finding.suppressionReason ?? null} expiresAt={finding.suppressionExpiresAt ?? null} /></div> : null}
               <div className="mt-2 text-sm text-muted-foreground">Versions found: {finding.versionsFound.join(", ")}</div>
               <div className="mt-3 text-sm">{finding.recommendation}</div>
-              {finding.snippet ? <SnippetCard title="Suggested snippet" snippet={finding.snippet} /> : null}
+              {finding.snippet ? <div className="mt-4"><SnippetCard title="Suggested snippet" snippet={finding.snippet} /></div> : null}
             </div>
           ))}
         </CardContent>
@@ -118,8 +218,12 @@ export function VersionConflictsPanel({
   );
 }
 
-export function DuplicateClassesPanel({ findings }: { findings: DuplicateClassFinding[] }) {
-  if (findings.length === 0) {
+export function DuplicateClassesPanel({ findings, onSuppress }: { findings: DuplicateClassFinding[]; onSuppress?: (draft: SuppressionDraft) => void }) {
+  const [showSuppressed, setShowSuppressed] = useState(false);
+  const visible = filterSuppressed(findings, showSuppressed);
+  const suppressedCount = findings.filter((item) => item.suppressed).length;
+
+  if (visible.length === 0 && suppressedCount === 0) {
     return (
       <Card>
         <CardHeader>
@@ -132,26 +236,46 @@ export function DuplicateClassesPanel({ findings }: { findings: DuplicateClassFi
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>Duplicate classes</CardTitle>
-          <CardDescription>
-            These findings highlight exact duplicate classes, split packages, and a few high-signal runtime pattern collisions that often lead to classpath shadowing or unpredictable behavior.
-          </CardDescription>
-        </CardHeader>
-      </Card>
+      <SectionHeader
+        title="Duplicate classes"
+        description="These findings highlight exact duplicate classes, split packages, and a few high-signal runtime pattern collisions that often lead to classpath shadowing or unpredictable behavior."
+        showSuppressed={showSuppressed}
+        setShowSuppressed={setShowSuppressed}
+        suppressedCount={suppressedCount}
+      />
 
-      {findings.map((finding, index) => (
-        <Card key={`${finding.findingType}-${finding.symbol}-${index}`}>
+      {visible.map((finding, index) => (
+        <Card key={`${finding.findingType}-${finding.symbol}-${index}`} className={finding.suppressed ? "border-sky-500/40" : undefined}>
           <CardContent className="space-y-4 p-6">
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <div className="text-lg font-semibold">{finding.symbol}</div>
                 <div className="text-sm text-muted-foreground">{finding.packageName ?? finding.findingType}</div>
               </div>
-              <Badge variant={duplicateSeverityVariant(finding.severity)}>{finding.severity}</Badge>
-              <Badge variant="neutral">{finding.findingType}</Badge>
+              <div className="flex flex-wrap gap-2">
+                <Badge variant={duplicateSeverityVariant(finding.severity)}>{finding.severity}</Badge>
+                <Badge variant="neutral">{finding.findingType}</Badge>
+                {onSuppress && !finding.suppressed ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onSuppress({
+                      title: "Suppress duplicate class finding",
+                      description: "Keep the raw duplicate-class record, but hide it from the default review surface until the suppression is removed or expires.",
+                      targetLabel: `${finding.findingType}: ${finding.symbol}`,
+                      payload: {
+                        type: "DUPLICATE_CLASS",
+                        groupId: finding.findingType,
+                        artifactId: finding.symbol,
+                      },
+                    })}
+                  >
+                    <ShieldBan className="mr-2 h-4 w-4" /> Suppress
+                  </Button>
+                ) : null}
+              </div>
             </div>
+            {finding.suppressed ? <SuppressionNotice reason={finding.suppressionReason ?? null} expiresAt={finding.suppressionExpiresAt ?? null} /> : null}
             <div className="grid gap-4 lg:grid-cols-2">
               <InfoBlock title="Archives containing it">{finding.artifacts.join("\n")}</InfoBlock>
               <InfoBlock title="Recommended action">{finding.recommendation}</InfoBlock>
@@ -169,8 +293,9 @@ export function DuplicateClassesPanel({ findings }: { findings: DuplicateClassFi
   );
 }
 
-export function LicensesPanel({ licenses }: { licenses: LicenseFinding[] }) {
+export function LicensesPanel({ licenses, onSuppress }: { licenses: LicenseFinding[]; onSuppress?: (draft: SuppressionDraft) => void }) {
   const [categoryFilter, setCategoryFilter] = useState<string>("ALL");
+  const [showSuppressed, setShowSuppressed] = useState(false);
 
   const counts = useMemo(() => ({
     permissive: licenses.filter((license) => license.category === "permissive").length,
@@ -181,19 +306,25 @@ export function LicensesPanel({ licenses }: { licenses: LicenseFinding[] }) {
   }), [licenses]);
 
   const filtered = useMemo(
-    () => licenses.filter((license) => categoryFilter === "ALL" || license.category === categoryFilter),
-    [categoryFilter, licenses],
+    () => filterSuppressed(licenses, showSuppressed).filter((license) => categoryFilter === "ALL" || license.category === categoryFilter),
+    [categoryFilter, licenses, showSuppressed],
   );
 
   return (
     <div className="space-y-6">
+      <SectionHeader
+        title="Licenses"
+        description="Best-effort license extraction from embedded Maven POM metadata, manifest fields, license files, and imported SBOM evidence. Strong copyleft and unknown licenses are highlighted for faster review."
+        showSuppressed={showSuppressed}
+        setShowSuppressed={setShowSuppressed}
+        suppressedCount={licenses.filter((item) => item.suppressed).length}
+      />
+
       <Card>
         <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <CardTitle>Licenses</CardTitle>
-            <CardDescription>
-              Best-effort license extraction from embedded Maven POM metadata, manifest fields, and license file heuristics. Strong copyleft and unknown licenses are highlighted for faster review.
-            </CardDescription>
+            <CardTitle>License summary</CardTitle>
+            <CardDescription>Use the category filter to focus on permissive, weak copyleft, strong copyleft, unknown, or multiple-license findings.</CardDescription>
           </div>
           <select
             value={categoryFilter}
@@ -228,7 +359,7 @@ export function LicensesPanel({ licenses }: { licenses: LicenseFinding[] }) {
             <table className="min-w-full divide-y divide-border/70 text-sm">
               <thead className="bg-secondary/60 text-left">
                 <tr>
-                  {["Dependency", "License", "Category", "Source", "Confidence", "Warnings"].map((header) => (
+                  {["Dependency", "License", "Category", "Source", "Confidence", "Warnings", "Actions"].map((header) => (
                     <th key={header} className="px-4 py-3 font-medium text-muted-foreground">{header}</th>
                   ))}
                 </tr>
@@ -239,6 +370,7 @@ export function LicensesPanel({ licenses }: { licenses: LicenseFinding[] }) {
                     <td className="px-4 py-3 align-top">
                       <div className="font-medium">{license.groupId ?? "unknown"}:{license.artifactId ?? "unknown"}</div>
                       <div className="text-muted-foreground">{license.version ?? "unknown"}</div>
+                      {license.suppressed ? <div className="mt-2"><SuppressionNotice reason={license.suppressionReason ?? null} expiresAt={license.suppressionExpiresAt ?? null} /></div> : null}
                     </td>
                     <td className="px-4 py-3 align-top">
                       <div>{license.licenseName}</div>
@@ -250,11 +382,32 @@ export function LicensesPanel({ licenses }: { licenses: LicenseFinding[] }) {
                     <td className="px-4 py-3 align-top text-muted-foreground">
                       {license.warnings.length > 0 ? license.warnings.join(" ") : "None"}
                     </td>
+                    <td className="px-4 py-3 align-top">
+                      {onSuppress && !license.suppressed ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => onSuppress({
+                            title: "Suppress license finding",
+                            description: "Keep the raw license finding, but hide it from the default review surface until the suppression is removed or expires.",
+                            targetLabel: `${license.groupId ?? "unknown"}:${license.artifactId ?? "unknown"}:${license.version ?? "unknown"}`,
+                            payload: {
+                              type: "LICENSE",
+                              groupId: license.groupId,
+                              artifactId: license.artifactId,
+                              version: license.version,
+                            },
+                          })}
+                        >
+                          <ShieldBan className="mr-2 h-4 w-4" /> Suppress
+                        </Button>
+                      ) : null}
+                    </td>
                   </tr>
                 ))}
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-5 text-muted-foreground">No license findings matched the selected category filter.</td>
+                    <td colSpan={7} className="px-4 py-5 text-muted-foreground">No license findings matched the current filters.</td>
                   </tr>
                 ) : null}
               </tbody>
@@ -266,10 +419,11 @@ export function LicensesPanel({ licenses }: { licenses: LicenseFinding[] }) {
   );
 }
 
-export function UsageAnalysisPanel({ findings }: { findings: DependencyUsageFinding[] }) {
+export function UsageAnalysisPanel({ findings, onSuppress }: { findings: DependencyUsageFinding[]; onSuppress?: (draft: SuppressionDraft) => void }) {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [sortBy, setSortBy] = useState("status");
+  const [showSuppressed, setShowSuppressed] = useState(false);
 
   const statuses = useMemo(
     () => Array.from(new Set(findings.map((finding) => finding.status))).sort(),
@@ -278,7 +432,7 @@ export function UsageAnalysisPanel({ findings }: { findings: DependencyUsageFind
 
   const filtered = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
-    const rows = findings.filter((finding) => {
+    const rows = filterSuppressed(findings, showSuppressed).filter((finding) => {
       const matchesStatus = statusFilter === "ALL" || finding.status === statusFilter;
       const matchesQuery = !normalizedQuery
         || `${finding.groupId ?? ""}:${finding.artifactId ?? ""}:${finding.version ?? ""}`.toLowerCase().includes(normalizedQuery)
@@ -297,18 +451,19 @@ export function UsageAnalysisPanel({ findings }: { findings: DependencyUsageFind
           return statusRank(left.status) - statusRank(right.status) || usageKey(left).localeCompare(usageKey(right));
       }
     });
-  }, [findings, query, sortBy, statusFilter]);
+  }, [findings, query, showSuppressed, sortBy, statusFilter]);
 
   return (
     <div className="space-y-6">
+      <SectionHeader
+        title="Usage Analysis"
+        description="Dependency usage findings are evidence-based, not absolute. JARScan combines Maven dependency:analyze, bytecode references, packaging metadata, and runtime heuristics to explain why a dependency looks used, apparently unused, or only possibly runtime-used."
+        showSuppressed={showSuppressed}
+        setShowSuppressed={setShowSuppressed}
+        suppressedCount={findings.filter((item) => item.suppressed).length}
+      />
       <Card>
         <CardHeader className="space-y-4">
-          <div>
-            <CardTitle>Usage Analysis</CardTitle>
-            <CardDescription>
-              Dependency usage findings are evidence-based, not absolute. JARScan combines Maven `dependency:analyze`, bytecode references, packaging metadata, and runtime heuristics to explain why a dependency looks used, apparently unused, or only possibly runtime-used.
-            </CardDescription>
-          </div>
           <div className="rounded-3xl border border-amber-500/30 bg-amber-500/10 px-4 py-4 text-sm text-amber-900 dark:text-amber-100">
             Java dependencies may be used through reflection, configuration, ServiceLoader, Spring auto-configuration, servlet containers, logging frameworks, JDBC drivers, or runtime plugin loading. Removal suggestions should be reviewed and tested.
           </div>
@@ -346,7 +501,7 @@ export function UsageAnalysisPanel({ findings }: { findings: DependencyUsageFind
         <table className="min-w-full divide-y divide-border/70 text-sm">
           <thead className="bg-secondary/60 text-left">
             <tr>
-              {["Dependency", "Status", "Confidence", "Size", "Vulns", "Evidence", "Suggested action"].map((header) => (
+              {["Dependency", "Status", "Confidence", "Size", "Vulns", "Evidence", "Suggested action", "Actions"].map((header) => (
                 <th key={header} className="px-4 py-3 font-medium text-muted-foreground">{header}</th>
               ))}
             </tr>
@@ -364,6 +519,7 @@ export function UsageAnalysisPanel({ findings }: { findings: DependencyUsageFind
                       ))}
                     </div>
                   ) : null}
+                  {finding.suppressed ? <div className="mt-2"><SuppressionNotice reason={finding.suppressionReason ?? null} expiresAt={finding.suppressionExpiresAt ?? null} /></div> : null}
                 </td>
                 <td className="px-4 py-3 align-top"><Badge variant={usageStatusVariant(finding.status)}>{finding.status}</Badge></td>
                 <td className="px-4 py-3 align-top"><Badge variant={confidenceVariant(finding.confidence)}>{finding.confidence}</Badge></td>
@@ -380,11 +536,32 @@ export function UsageAnalysisPanel({ findings }: { findings: DependencyUsageFind
                   </div>
                 </td>
                 <td className="px-4 py-3 align-top">{finding.suggestedAction}</td>
+                <td className="px-4 py-3 align-top">
+                  {onSuppress && !finding.suppressed ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onSuppress({
+                        title: "Suppress usage finding",
+                        description: "Keep the raw usage finding, but hide it from the default review surface until the suppression is removed or expires.",
+                        targetLabel: `${finding.groupId ?? "unknown"}:${finding.artifactId ?? "unknown"}:${finding.version ?? "unknown"}`,
+                        payload: {
+                          type: "USAGE",
+                          groupId: finding.groupId,
+                          artifactId: finding.artifactId,
+                          version: finding.version,
+                        },
+                      })}
+                    >
+                      <ShieldBan className="mr-2 h-4 w-4" /> Suppress
+                    </Button>
+                  ) : null}
+                </td>
               </tr>
             ))}
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-5 text-muted-foreground">No dependency usage findings matched the current filters.</td>
+                <td colSpan={8} className="px-4 py-5 text-muted-foreground">No dependency usage findings matched the current filters.</td>
               </tr>
             ) : null}
           </tbody>
@@ -493,6 +670,99 @@ export function SlimmingAdvisorPanel({
   );
 }
 
+export function PolicyResultsPanel({ evaluation, onSuppress }: { evaluation: PolicyEvaluation | null; onSuppress?: (draft: SuppressionDraft) => void }) {
+  const [showSuppressed, setShowSuppressed] = useState(false);
+  if (!evaluation) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Policy results</CardTitle>
+          <CardDescription>Policy evaluation is not available for this result yet.</CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
+
+  const visible = filterSuppressed(evaluation.findings, showSuppressed);
+  return (
+    <div className="space-y-6">
+      <SectionHeader
+        title="Policy results"
+        description="Policies are evaluated against reopened scans using the current policy set. Suppressed findings remain in the raw result, but they no longer drive the overall warning/failure state while the suppression is active."
+        showSuppressed={showSuppressed}
+        setShowSuppressed={setShowSuppressed}
+        suppressedCount={evaluation.findings.filter((item) => item.suppressed).length}
+      />
+
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {[
+          ["Overall", evaluation.overallStatus, evaluation.overallStatus === "FAILED" ? "critical" : evaluation.overallStatus === "WARNING" ? "medium" : "low"],
+          ["Passed", evaluation.passedCount, "low"],
+          ["Warnings", evaluation.warningCount, "medium"],
+          ["Failures", evaluation.failedCount, "critical"],
+        ].map(([label, value, variant]) => (
+          <Card key={String(label)}>
+            <CardContent className="p-5">
+              <Badge variant={variant as never}>{label}</Badge>
+              <div className="mt-3 font-display text-3xl font-semibold tracking-tight">{value}</div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {visible.length === 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>No visible policy findings</CardTitle>
+            <CardDescription>All policy findings are currently suppressed, or there are no policy findings to show.</CardDescription>
+          </CardHeader>
+        </Card>
+      ) : (
+        visible.map((finding) => (
+          <Card key={finding.policyId} className={finding.suppressed ? "border-sky-500/40" : undefined}>
+            <CardContent className="space-y-4 p-6">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div className="text-lg font-semibold">{finding.policyName}</div>
+                  <div className="text-sm text-muted-foreground">{finding.ruleType}</div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant={finding.status === "FAILED" ? "critical" : finding.status === "WARNING" ? "medium" : "low"}>{finding.status}</Badge>
+                  <Badge variant={finding.severity === "FAIL" ? "critical" : "neutral"}>{finding.severity}</Badge>
+                  {onSuppress && finding.status !== "PASSED" && !finding.suppressed ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onSuppress({
+                        title: "Suppress policy finding",
+                        description: "Keep the raw policy finding, but hide it from the default review surface while the suppression remains active.",
+                        targetLabel: finding.policyName,
+                        payload: {
+                          type: "POLICY",
+                          groupId: finding.policyId,
+                          artifactId: finding.affectedDependencies[0] ?? null,
+                        },
+                      })}
+                    >
+                      <ShieldBan className="mr-2 h-4 w-4" /> Suppress
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+              {finding.suppressed ? <SuppressionNotice reason={finding.suppressionReason ?? null} expiresAt={finding.suppressionExpiresAt ?? null} /> : null}
+              <div className="text-sm">{finding.message}</div>
+              <div className="grid gap-4 lg:grid-cols-2">
+                <InfoBlock title="Affected dependencies">{finding.affectedDependencies.length > 0 ? finding.affectedDependencies.join("\n") : "None listed"}</InfoBlock>
+                <InfoBlock title="Recommendation">{finding.recommendation}</InfoBlock>
+              </div>
+            </CardContent>
+          </Card>
+        ))
+      )}
+    </div>
+  );
+}
+
 function SnippetCard({ title, snippet }: { title: string; snippet: string }) {
   return (
     <div className="space-y-2 rounded-3xl border border-border/70 bg-background/70 px-4 py-4">
@@ -500,7 +770,15 @@ function SnippetCard({ title, snippet }: { title: string; snippet: string }) {
         <div className="flex items-center gap-2 text-sm font-medium">
           <Scale className="h-4 w-4" /> {title}
         </div>
-        <Button type="button" variant="outline" size="sm" onClick={() => void navigator.clipboard?.writeText(snippet)}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            void navigator.clipboard?.writeText(snippet);
+            toast.success(`${title} copied`);
+          }}
+        >
           <Copy className="mr-2 h-4 w-4" /> Copy
         </Button>
       </div>
@@ -519,109 +797,57 @@ function InfoBlock({ title, children }: { title: string; children: string }) {
 }
 
 function riskVariant(risk: string) {
-  switch (risk) {
-    case "HIGH":
-      return "critical" as const;
-    case "MEDIUM":
-      return "medium" as const;
-    default:
-      return "neutral" as const;
-  }
+  if (risk === "HIGH") return "critical" as const;
+  if (risk === "MEDIUM") return "medium" as const;
+  return "low" as const;
 }
 
 function duplicateSeverityVariant(severity: string) {
-  switch (severity) {
-    case "HIGH":
-      return "critical" as const;
-    case "MEDIUM":
-      return "medium" as const;
-    default:
-      return "neutral" as const;
-  }
+  if (severity === "HIGH") return "critical" as const;
+  if (severity === "MEDIUM") return "medium" as const;
+  return "low" as const;
 }
 
 function licenseCategoryVariant(category: string) {
-  switch (category) {
-    case "permissive":
-      return "low" as const;
-    case "weak copyleft":
-      return "medium" as const;
-    case "strong copyleft":
-      return "critical" as const;
-    case "multiple":
-      return "info" as const;
-    default:
-      return "neutral" as const;
-  }
-}
-
-function usageStatusVariant(status: string) {
-  switch (status) {
-    case "USED":
-      return "low" as const;
-    case "USED_UNDECLARED":
-      return "high" as const;
-    case "POSSIBLY_RUNTIME_USED":
-      return "medium" as const;
-    case "DECLARED_BUT_UNUSED":
-    case "APPARENTLY_UNUSED":
-    case "PACKAGED_BUT_APPARENTLY_UNUSED":
-      return "critical" as const;
-    default:
-      return "neutral" as const;
-  }
+  if (category === "strong copyleft") return "critical" as const;
+  if (category === "weak copyleft") return "medium" as const;
+  if (category === "permissive") return "low" as const;
+  if (category === "multiple") return "info" as const;
+  return "neutral" as const;
 }
 
 function confidenceVariant(confidence: string) {
-  switch (confidence) {
-    case "HIGH":
-      return "critical" as const;
-    case "MEDIUM":
-      return "medium" as const;
-    case "LOW":
-      return "neutral" as const;
-    default:
-      return "neutral" as const;
-  }
+  if (confidence === "HIGH") return "low" as const;
+  if (confidence === "MEDIUM") return "medium" as const;
+  return "info" as const;
+}
+
+function usageStatusVariant(status: string) {
+  if (["USED", "USED_UNDECLARED"].includes(status)) return "low" as const;
+  if (status === "POSSIBLY_RUNTIME_USED") return "medium" as const;
+  if (["APPARENTLY_UNUSED", "DECLARED_BUT_UNUSED", "PACKAGED_BUT_APPARENTLY_UNUSED"].includes(status)) return "critical" as const;
+  return "neutral" as const;
+}
+
+function confidenceRank(confidence: string) {
+  return confidence === "HIGH" ? 0 : confidence === "MEDIUM" ? 1 : 2;
+}
+
+function statusRank(status: string) {
+  if (status === "USED") return 0;
+  if (status === "USED_UNDECLARED") return 1;
+  if (status === "POSSIBLY_RUNTIME_USED") return 2;
+  if (status === "UNKNOWN") return 3;
+  if (status === "DECLARED_BUT_UNUSED") return 4;
+  if (status === "PACKAGED_BUT_APPARENTLY_UNUSED") return 5;
+  if (status === "APPARENTLY_UNUSED") return 6;
+  return 7;
 }
 
 function usageKey(finding: DependencyUsageFinding) {
   return `${finding.groupId ?? "unknown"}:${finding.artifactId ?? "unknown"}:${finding.version ?? "unknown"}`;
 }
 
-function confidenceRank(confidence: string) {
-  switch (confidence) {
-    case "HIGH":
-      return 0;
-    case "MEDIUM":
-      return 1;
-    case "LOW":
-      return 2;
-    default:
-      return 3;
-  }
-}
-
-function statusRank(status: string) {
-  switch (status) {
-    case "USED_UNDECLARED":
-      return 0;
-    case "DECLARED_BUT_UNUSED":
-    case "APPARENTLY_UNUSED":
-    case "PACKAGED_BUT_APPARENTLY_UNUSED":
-      return 1;
-    case "POSSIBLY_RUNTIME_USED":
-      return 2;
-    case "USED":
-      return 3;
-    default:
-      return 4;
-  }
-}
-
-function formatBytesOrUnknown(value: number | null) {
-  if (value == null) {
-    return "n/a";
-  }
-  return `${(value / 1024 / 1024).toFixed(2)} MB`;
+function formatBytesOrUnknown(bytes: number | null) {
+  return bytes == null ? "Unknown" : `${(bytes / 1024 / 1024).toFixed(2)} MB`;
 }

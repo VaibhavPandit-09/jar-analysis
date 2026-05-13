@@ -4,19 +4,29 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 import { UploadZone } from "@/components/upload-zone";
-import { createAnalysisJob } from "@/lib/api";
+import { createAnalysisJob, importSbom } from "@/lib/api";
 
 function validateSelection(files: File[]) {
   const pomFiles = files.filter((file) => file.name.toLowerCase() === "pom.xml");
   const zipFiles = files.filter((file) => file.name.toLowerCase().endsWith(".zip"));
+  const sbomFiles = files.filter((file) => {
+    const lower = file.name.toLowerCase();
+    return lower.endsWith(".json") || lower.endsWith(".cdx.json") || lower.endsWith(".bom.json");
+  });
   if (pomFiles.length > 1) {
     return "Only one pom.xml can be uploaded at a time.";
   }
   if (zipFiles.length > 1) {
     return "Only one project ZIP can be uploaded at a time.";
   }
+  if (sbomFiles.length > 1) {
+    return "Only one CycloneDX JSON SBOM can be imported at a time.";
+  }
   if ((pomFiles.length === 1 || zipFiles.length === 1) && files.length > 1) {
     return "Upload either one pom.xml, one project ZIP, or one or more archives, not a mixed set.";
+  }
+  if (sbomFiles.length === 1 && files.length > 1) {
+    return "Upload either one CycloneDX JSON SBOM or a normal analysis set, not both together.";
   }
   return null;
 }
@@ -51,6 +61,16 @@ export function UploadPage() {
 
     try {
       setIsSubmitting(true);
+      const sbomFile = files.find((file) => {
+        const lower = file.name.toLowerCase();
+        return lower.endsWith(".json") || lower.endsWith(".cdx.json") || lower.endsWith(".bom.json");
+      });
+      if (sbomFile) {
+        const imported = await importSbom(sbomFile);
+        toast.success("SBOM imported");
+        navigate(`/scans/${imported.scanId}/results`);
+        return;
+      }
       const { jobId } = await createAnalysisJob(files);
       toast.success("Analysis job started");
       navigate(`/jobs/${jobId}`);
@@ -90,6 +110,10 @@ export function UploadPage() {
             {
               title: "Project ZIP detection",
               copy: "Project archives are extracted safely with zip-slip protection, size limits, file-count limits, and best-effort root POM detection.",
+            },
+            {
+              title: "CycloneDX import",
+              copy: "CycloneDX JSON SBOMs can be imported into scan history for review, comparison, policy checks, and CycloneDX re-export.",
             },
           ].map((item) => (
             <div

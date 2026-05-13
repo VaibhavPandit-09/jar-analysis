@@ -70,6 +70,7 @@ public class JobController {
     private String extension(String format) {
         return switch (format.toLowerCase()) {
             case "markdown" -> "md";
+            case "cyclonedx-json" -> "cdx.json";
             default -> format.toLowerCase();
         };
     }

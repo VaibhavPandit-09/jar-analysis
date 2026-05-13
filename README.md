@@ -1,127 +1,294 @@
-# JARScan
+# JARScan v2
 
-JARScan is a personal web-based Java artifact analyzer for `.jar`, `.war`, `.ear`, `.zip`, and `pom.xml` inputs. It resolves Maven dependencies inside the container, inspects archive metadata without executing uploaded code, detects nested libraries, safely extracts project archives, streams progress over Server-Sent Events, and folds local vulnerability findings into a modern React dashboard.
+JARScan is a local-first Java dependency intelligence tool for JAR, WAR, EAR, Maven POM, project ZIP, and CycloneDX JSON SBOM inputs.
 
-## Features
+It is designed to answer dependency-focused questions such as:
+- What libraries are inside this archive or build?
+- Which Java version does it require?
+- Which dependencies are vulnerable?
+- Why is a transitive dependency present?
+- Where do version conflicts, duplicate classes, or license risks exist?
+- Which dependencies look removable based on evidence?
+- Which findings should be suppressed or enforced by policy?
 
-- Drag-and-drop or browse uploads for one or more archives
-- Single `pom.xml` upload with Maven transitive dependency resolution
-- Single project ZIP upload with safe extraction and best-effort structure detection
-- Parsed Maven dependency tree with path-to-dependency drill-down
-- Version conflict and dependency convergence analysis with generated `dependencyManagement` snippets
-- Duplicate class and split-package detection for scanned dependency archives
-- Best-effort dependency license analysis with category warnings
-- Evidence-based dependency usage analysis with confidence levels and warnings
-- Dependency slimming advisor with exclusion and replacement snippets
-- AWS bundle advisor for broad SDK bundle review
-- Java bytecode version inspection from class headers
-- Manifest parsing and Maven coordinate extraction
-- Nested/fat JAR detection for common layouts such as `BOOT-INF/lib/`
-- Deeper WAR/EAR layout inspection plus Fat JAR Inspector results
-- Live analysis progress and Maven log streaming
-- Local vulnerability scanning through OWASP Dependency-Check CLI
-- Optional NVD API key settings with masked local storage
-- JSON, Markdown, and HTML report export
-- Persistent scan history with reopen, notes/tags, and delete actions
-- Scan comparison between persisted scans with dependency and vulnerability deltas
-- Dependency Tree results tab with expand/collapse, search, scope filters, and conflict highlighting
-- Version Conflicts, Duplicate Classes, and Licenses results tabs
-- Usage Analysis and Slimming Advisor results tabs
-- Light, dark, and system theme support
+JARScan is not a Veracode-style source-code vulnerability scanner. It may inspect source files, resources, bytecode, and metadata only to understand dependency usage and packaging behavior.
 
-## AI Maintainer Context
+## What Is New In v2
 
-Before making broad changes, future AI agents should read:
+v2 adds:
+- persistent scan history in SQLite
+- reopenable scan results and scan comparison
+- NVD API key management in the UI
+- Dependency-Check DB status and manual sync
+- project ZIP upload with safe extraction and structure detection
+- Maven dependency tree parsing and visualization
+- path-to-dependency explanations
+- version conflict and dependency convergence analysis
+- duplicate class and split-package detection
+- license analysis and summary categories
+- evidence-based dependency usage analysis with confidence levels
+- dependency slimming advisor
+- AWS bundle advisor
+- suppressions and suppression management
+- policy engine and policy results
+- CycloneDX JSON SBOM import and export
 
-- `docs/ai-context/PROJECT_OVERVIEW.md`
-- `docs/ai-context/ARCHITECTURE.md`
-- `docs/ai-context/DESIGN_DECISIONS.md`
-- `docs/ai-context/NEXT_STEPS.md`
+## Supported Inputs
 
-## Screenshots
+- one or more `.jar`, `.war`, `.ear` files
+- one `pom.xml`
+- one project `.zip`
+- one CycloneDX `.json`, `.cdx.json`, or `.bom.json`
 
-- Placeholder: upload screen
-- Placeholder: live progress screen
-- Placeholder: results dashboard
+## Persistent Scan History
 
-## Stack
+Completed scans are persisted in SQLite and exposed in the Scan History page.
 
-- Backend: Java 25, Spring Boot 3.5, Maven
-- Frontend: React, Vite, TypeScript, Tailwind CSS, Radix primitives, shadcn-style UI components
-- Vulnerability scanning: OWASP Dependency-Check CLI with persisted local data directory
-- Container base image: `maven:3.9.14-eclipse-temurin-25`
-- Dependency-Check CLI bundled in the final runtime image: `12.2.1`
+You can:
+- reopen old results
+- compare two stored scans
+- export prior scans
+- add notes and tags
+- preserve results across container restarts
 
-## Run With Docker Compose
+## NVD API Key Setup
+
+An NVD API key is optional.
+
+If configured:
+- it is stored locally on disk
+- the UI shows only a masked suffix
+- the raw key is not returned by the API
+- Dependency-Check can update faster on cold caches
+
+The Settings page supports:
+- save key
+- test key
+- delete key
+- inspect current masked status
+
+## Dependency-Check DB Sync
+
+The Settings page and top navigation expose:
+- current Dependency-Check DB status
+- last sync timestamps and duration
+- whether an NVD API key is configured
+- a manual sync action
+- a sync event log
+
+## Project ZIP Upload
+
+Project ZIP mode safely extracts archives with:
+- zip-slip protection
+- extracted-size limits
+- file-count limits
+- best-effort root `pom.xml` detection
+- compiled class and dependency-library directory detection
+
+## Dependency Tree Visualization
+
+For POM and Maven-backed project ZIP scans, JARScan captures Maven `dependency:tree` output, prefers JSON when available, and falls back to text parsing when JSON is unavailable.
+
+The Dependency Tree tab supports:
+- expand and collapse
+- expand all and collapse all
+- search
+- scope filtering
+- direct/transitive filtering
+- vulnerable node highlighting
+- conflict and omitted node highlighting
+- side-panel details
+
+## Path To Dependency
+
+JARScan can explain why a dependency is present by showing one or more paths from the root project to the selected dependency.
+
+This is available from:
+- the Dependency Tree tab
+- vulnerability rows with `Show path` when a dependency-tree match exists
+
+## Usage Analysis And Confidence Levels
+
+Dependency usage analysis is evidence-based, not absolute.
+
+Statuses include:
+- `USED`
+- `APPARENTLY_UNUSED`
+- `POSSIBLY_RUNTIME_USED`
+- `UNKNOWN`
+- `USED_UNDECLARED`
+- `DECLARED_BUT_UNUSED`
+- `PACKAGED_BUT_APPARENTLY_UNUSED`
+- `RESOLVED_BUT_NOT_PACKAGED`
+- `PACKAGED_BUT_NOT_RESOLVED`
+
+Each finding includes:
+- confidence: `HIGH`, `MEDIUM`, or `LOW`
+- evidence
+- warnings
+- suggested action
+
+Evidence sources include:
+- Maven `dependency:analyze`
+- bytecode constant-pool references
+- packaged archive contents
+- ServiceLoader metadata
+- Spring metadata
+- resource and config hints
+- runtime/framework heuristics
+- source-import fallback when compiled classes are absent
+
+## Dependency Slimming Advisor
+
+The Slimming Advisor combines:
+- usage evidence
+- size impact
+- vulnerability contribution
+- transitive fan-out
+- version conflicts
+- duplicate/provider overlap
+- AWS bundle narrowing guidance
+
+It generates copyable snippets where possible:
+- Maven dependency snippets
+- exclusion snippets
+
+## AWS Bundle Advisor
+
+JARScan special-cases broad AWS SDK bundle usage.
+
+If a broad AWS bundle is detected, the advisor highlights:
+- used AWS service modules inferred from bytecode
+- apparently unused service modules
+- narrower replacement suggestions such as `software.amazon.awssdk:s3`
+- copyable Maven snippets
+
+## Version Conflicts
+
+JARScan detects:
+- multiple requested versions of the same `groupId:artifactId`
+- resolved version
+- introducing paths
+- omitted/conflict signals from Maven tree output
+- dependencyManagement snippet suggestions
+
+## Dependency Convergence
+
+JARScan reports convergence findings from the parsed Maven tree even when Maven already selected a single winning version.
+
+## Duplicate Classes
+
+JARScan can report:
+- exact duplicate classes across JARs
+- split packages
+- a few high-signal runtime collision patterns such as multiple SLF4J bindings and version skew in common families
+
+## License Analysis
+
+License extraction is best-effort and uses:
+- embedded Maven `pom.xml`
+- Maven metadata already captured by the scan
+- `LICENSE` and `NOTICE` files
+- manifest evidence
+- imported SBOM license declarations
+
+Categories include:
+- permissive
+- weak copyleft
+- strong copyleft
+- commercial
+- unknown
+- multiple
+
+## Suppressions
+
+Suppressions are persisted in SQLite and can be created from the results UI or managed on the Suppressions page.
+
+Supported suppression types:
+- vulnerability
+- license
+- policy
+- dependency
+- version conflict
+- duplicate class
+- usage
+
+Suppressed findings are not deleted. They are returned with suppression metadata and can be shown or hidden in the UI.
+
+## Policies
+
+Policies are persisted in SQLite and evaluated against reopened scans.
+
+Built-in policies include:
+- fail if critical vulnerabilities exist
+- warn if high vulnerabilities exist
+- warn if unknown licenses exist
+- fail if strong copyleft licenses exist
+- warn if dependencies are apparently unused
+- warn if duplicate classes exist
+- warn if multiple versions of the same artifact exist
+- warn if required Java exceeds a configured limit
+- warn if SNAPSHOT dependencies exist
+- warn if broad bundle dependencies exist
+
+## SBOM Import And Export
+
+Export:
+- JSON
+- Markdown
+- HTML
+- CycloneDX JSON
+
+Import:
+- CycloneDX JSON SBOMs through the Upload page or `POST /api/sbom/import`
+
+Imported SBOMs are persisted as stored scans so they can be:
+- reopened
+- compared
+- exported again
+- evaluated by policies
+
+## Scan Comparison
+
+The Compare page supports two stored scans and highlights:
+- dependency additions, removals, and updates
+- vulnerability additions, fixes, and changes
+- high-level summary deltas
+
+## Data Storage
+
+Primary persistent state:
+- SQLite database at `${JARSCAN_DB_PATH}` or `${JARSCAN_DATA_DIR}/jarscan.db`
+
+Other local state:
+- Dependency-Check data directory
+- Maven cache
+- local NVD API key secret file
+
+## Security Model
+
+JARScan is local-first and does not execute uploaded code.
+
+It analyzes:
+- archive contents
+- manifests
+- metadata
+- compiled bytecode bytes
+- Maven command output
+- resource/config files
+
+It does not perform application source-code vulnerability scanning.
+
+## Running Locally
+
+### Docker Compose
 
 ```bash
 docker compose up -d --build
 ```
 
-Open [http://localhost:8080](http://localhost:8080).
-
-## What Happens On Upload
-
-### Archive upload
-
-1. Files are copied into a job-specific temporary workspace.
-2. JARScan inspects archive entries, hashes, manifests, bytecode versions, Maven metadata, and nested libraries.
-3. Dependency-Check scans the extracted artifact set if its CLI is available.
-4. Results are exposed through the results API and UI, and completed scans are persisted into local SQLite history.
-
-### `pom.xml` upload
-
-1. The uploaded `pom.xml` is stored in a temporary workspace.
-2. Maven runs inside the container with `ProcessBuilder`.
-3. `dependency:copy-dependencies` resolves and downloads transitive dependencies into a job-local directory.
-4. `dependency:tree` output is captured and parsed into a structured dependency tree when possible.
-5. Parsed dependency nodes are attached to the result JSON for visualization and path-to-dependency exploration.
-6. Version conflicts, convergence issues, duplicate classes, dependency licenses, usage evidence, and slimming opportunities are derived from the resolved graph and analyzed artifacts on a best-effort basis.
-7. Each resolved artifact is analyzed like a direct archive upload.
-
-### Project ZIP upload
-
-1. The uploaded ZIP is extracted into a job-specific temporary workspace with zip-slip protection.
-2. Extraction is bounded by file-count and extracted-size limits.
-3. JARScan detects `pom.xml` files, packaged archives, compiled class directories, dependency library directories, Spring metadata, and ServiceLoader metadata.
-4. If a best-effort root POM is detected, Maven dependency resolution runs from that POM.
-5. Parsed dependency tree data is attached when Maven tree output is available.
-6. Conflict, convergence, duplicate-class, license, usage, and slimming analysis run against the detected dependency set when enough evidence exists.
-7. Packaged JAR/WAR/EAR artifacts and detected dependency archives are analyzed like normal archives.
-
-## Volumes And Persistence
-
-`docker-compose.yml` mounts:
-
-- `jarscan-data` to `/app/data`
-  - Dependency-Check data cache lives under `/app/data/dependency-check`
-- `jarscan-m2` to `/root/.m2`
-  - Maven dependency cache for faster repeated POM analysis
-
-## Persistent Scan History
-
-Completed scans are stored in a local SQLite database so history survives container restarts and image rebuilds as long as the Docker volume is preserved.
-
-- Default database path: `/app/data/jarscan.db`
-- Override with `JARSCAN_DB_PATH`
-- The database lives under the `jarscan-data` volume by default
-- Deleting Docker volumes with `docker compose down -v` also deletes stored scan history
-- The frontend exposes this history at `/scan-history`
-- Reopened scans render in the same results dashboard used for fresh job results
-- Scan comparison UI is available at `/compare` and can be launched from scan history
-
-## NVD API Key And Vulnerability DB Settings
-
-JARScan exposes a local settings page at `/settings` for Dependency-Check configuration.
-
-- NVD API key setup is optional
-- The key can make Dependency-Check updates much faster
-- The raw key is stored locally in a restricted file under `/app/data/secrets/nvd-api-key`
-- Only a masked suffix such as `****abcd` is returned to the UI
-- The raw key is not included in reports, API responses, or SSE logs
-- Dependency-Check DB status and manual sync controls are available from the settings page
-
-## Local Development
+Frontend and backend are served together at:
+- [http://localhost:8080](http://localhost:8080)
 
 ### Backend
 
@@ -138,83 +305,55 @@ npm install
 npm run dev
 ```
 
-The Vite dev server proxies `/api` requests to `http://localhost:8080`.
+## Important API Endpoints
 
-## Configuration
-
-Environment variables supported by the backend:
-
-- `JARSCAN_DATA_DIR`
-- `JARSCAN_DB_PATH`
-- `JARSCAN_DEPENDENCY_CHECK_COMMAND`
-- `JARSCAN_MAX_UPLOAD_SIZE`
-- `JARSCAN_MAVEN_TIMEOUT_SECONDS`
-- `JARSCAN_MAVEN_DEPENDENCY_SCOPE`
-- `JARSCAN_MAX_NESTED_JAR_DEPTH`
-- `JARSCAN_MAX_EXTRACTED_ARCHIVE_SIZE_BYTES`
-- `JARSCAN_PROJECT_ZIP_MAX_FILES`
-- `JARSCAN_PROJECT_ZIP_MAX_EXTRACTED_SIZE_BYTES`
-- `JARSCAN_MAX_DUPLICATE_CLASS_SCAN_JARS`
-
-Most users should configure the NVD API key through the UI rather than an environment variable.
-
-## Export Formats
-
-- JSON: `/api/jobs/{jobId}/export?format=json`
-- Markdown: `/api/jobs/{jobId}/export?format=markdown`
-- HTML: `/api/jobs/{jobId}/export?format=html`
-
-From the scan history page, these export formats are also available for persisted scans through the stored job identity.
-
-## Resetting Data
-
-To remove persisted Maven and vulnerability caches:
-
-```bash
-docker compose down -v
-```
-
-## Troubleshooting
-
-### First vulnerability DB sync is slow
-
-Dependency-Check may need to initialize or refresh its local database on first use. The first scan or manual sync can take several minutes depending on network conditions, especially without an NVD API key.
-
-### Maven resolution failed
-
-Check the live log panel on the job page. Common causes:
-
-- broken or non-buildable uploaded `pom.xml`
-- private repositories requiring credentials
-- corporate mirrors not reachable from the container
-
-### POM uses private repositories
-
-JARScan intentionally relies on the Maven CLI in-container. If your POM needs private credentials or custom Maven settings, mount or bake in the required Maven configuration before running scans.
-
-### Large projects take time
-
-POM resolution plus Dependency-Check can be expensive on very large graphs. The Maven cache and Dependency-Check data cache will reduce repeated run times.
-
-### Frontend route refresh returns 404
-
-The backend includes SPA forwarding for `/scan-history`, `/settings`, `/jobs/:jobId`, `/jobs/:jobId/results`, and `/scans/:scanId/results`. Rebuild the image if you are running an older container.
-
-### Java 25 image concerns
-
-The project is built and run on Eclipse Temurin Java 25 through the official Maven image `maven:3.9.14-eclipse-temurin-25`.
+- `POST /api/jobs`
+- `GET /api/jobs/{jobId}/status`
+- `GET /api/jobs/{jobId}/result`
+- `GET /api/jobs/{jobId}/export?format=json|markdown|html|cyclonedx-json`
+- `GET /api/scans`
+- `GET /api/scans/{scanId}`
+- `GET /api/scans/{scanId}/export?format=json|markdown|html|cyclonedx-json`
+- `GET /api/scans/by-job/{jobId}`
+- `GET /api/compare?base={scanId}&target={scanId}`
+- `GET /api/settings/nvd`
+- `POST /api/settings/nvd`
+- `POST /api/settings/nvd/test`
+- `DELETE /api/settings/nvd`
+- `GET /api/vulnerability-db/status`
+- `POST /api/vulnerability-db/sync`
+- `GET /api/suppressions`
+- `POST /api/suppressions`
+- `PATCH /api/suppressions/{id}`
+- `DELETE /api/suppressions/{id}`
+- `GET /api/policies`
+- `POST /api/policies`
+- `PATCH /api/policies/{id}`
+- `DELETE /api/policies/{id}`
+- `POST /api/policies/evaluate/{scanId}`
+- `POST /api/sbom/import`
 
 ## Known Limitations
 
-- Dependency-Check findings depend on its local database state and may take time on a cold start.
-- NVD API key storage is local-first and masked in the UI, but the host machine and persisted Docker volume should still be treated as sensitive when a key is configured.
-- Private Maven repositories are not automatically authenticated.
-- Running jobs and SSE event streams are still in-memory while the job is active, even though completed scan results now persist in SQLite history.
-- Dependency tables on individual artifact cards focus on embedded nested archives rather than reconstructing a full Maven graph per artifact.
-- Full dependency tree visualization requires Maven tree output from an uploaded `pom.xml` or a project ZIP with a usable root `pom.xml`.
-- Version conflict and convergence findings are strongest when Maven tree output includes omitted/conflict context. If Maven only exposes a simpler tree, JARScan still reports best-effort multi-version findings.
-- Duplicate class detection is limited to the analyzed archive set and bounded by `JARSCAN_MAX_DUPLICATE_CLASS_SCAN_JARS` to avoid excessive scan cost on very large uploads.
-- License analysis is best-effort and may rely on embedded Maven POMs, manifest fields, or license file heuristics; unknown or multiple-license findings should be reviewed manually.
-- Dependency usage analysis is evidence-based, not absolute. Apparently unused findings must be reviewed against reflection, configuration, ServiceLoader, Spring, servlet-container, logging, JDBC, and plugin-loading behavior before removal.
-- Slimming suggestions and AWS bundle replacement advice are recommendations only. Review and test startup, integration, and runtime-configuration paths before applying exclusions or narrowing modules.
-- Project ZIP analysis is best-effort. If no usable root POM or compiled classes exist, Maven-backed resolution and Java-version evidence will be more limited.
+1. Dependency-Check DB freshness
+   Dependency-Check findings depend on its local database state. Cold-start updates can be slow, especially without an NVD API key.
+2. Optional NVD API key
+   An NVD API key can improve update speed. If configured, it is stored locally and masked in UI and logs.
+3. Private Maven repositories
+   Private repositories require mounted `settings.xml` or other Maven credential configuration. JARScan does not automatically authenticate to private repositories.
+4. Unused dependency analysis is evidence-based
+   Java dependencies may be loaded through reflection, configuration, ServiceLoader, Spring auto-configuration, servlet containers, logging frameworks, JDBC drivers, or runtime plugins.
+5. Not source-code vulnerability scanning
+   JARScan may inspect source files, resources, and bytecode to understand dependency usage only. It does not perform application vulnerability scanning.
+6. Standalone archives have limited graph reconstruction
+   Standalone JAR/WAR/EAR uploads without usable POM metadata may not provide enough information to reconstruct the full Maven dependency graph.
+7. Source-only project ZIPs are less reliable
+   If compiled classes are absent, usage analysis falls back to weaker source/import/resource heuristics.
+8. Suggested exclusions require testing
+   Generated exclusions and dependencyManagement snippets are recommendations only.
+9. SBOM import limitations
+   Imported SBOM quality depends on the source SBOM completeness.
+
+## AI Maintainer Context
+
+Maintainer docs live under `docs/ai-context/` and now reflect the final v2 architecture, APIs, persistence model, and v3 ideas.

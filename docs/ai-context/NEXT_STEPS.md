@@ -1,41 +1,36 @@
 # Next Steps
 
-## Session 1
+## v2 Completed Summary
 
-AI context docs and v2 roadmap foundation.
+JARScan v2 is now complete.
 
-## Session 2
+The completed v2 milestone includes:
+- persistent scan history
+- compare workflow
+- NVD settings and DB sync UI
+- project ZIP analysis
+- Maven dependency tree parsing and visualization
+- path-to-dependency explanations
+- version conflict and convergence analysis
+- duplicate class detection
+- license analysis
+- evidence-based usage analysis
+- slimming advisor and AWS bundle advisor
+- suppressions
+- policy engine
+- CycloneDX JSON SBOM import/export
 
-SQLite persistent scan history backend.
+## Possible v3 Improvements
 
-## Session 3
-
-Scan history UI and scan result reopening.
-
-## Session 4
-
-NVD API key settings, Dependency-Check DB status, and manual sync UI.
-
-## Session 5
-
-Scan comparison.
-
-## Session 6
-
-Project ZIP upload, WAR/EAR deep inspection, and fat JAR inspector.
-
-## Session 7
-
-Maven dependency tree parser, dependency tree visualization, and path-to-dependency view.
-
-## Session 8
-
-Version conflict analyzer, dependency convergence analyzer, duplicate class detection, and license analysis.
-
-## Session 9
-
-Dependency usage analyzer, unused dependency confidence model, dependency slimming advisor, and AWS bundle advisor.
-
-## Session 10
-
-Suppression system, SBOM import/export, policy engine, final UI polish, final docs, and tests.
+High-value v3 ideas:
+- Gradle support
+- Maven `settings.xml` UI and credential helpers
+- scheduled Dependency-Check DB sync
+- CI mode and non-interactive reporting
+- PDF export
+- richer SBOM formats beyond CycloneDX JSON
+- repository trust and provenance checks
+- artifact signature verification
+- better package-to-artifact mapping for usage analysis
+- long-term scan trend charts and historical dashboards
+- richer suppression targeting for policy-only and class-level findings

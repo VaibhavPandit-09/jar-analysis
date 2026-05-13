@@ -100,10 +100,25 @@ public class ScanComparisonService {
                 countDiff(before.mediumCount(), after.mediumCount()),
                 countDiff(before.lowCount(), after.lowCount()),
                 doubleDiff(before.highestCvss(), after.highestCvss()),
-                null,
-                null,
-                null
+                baselinePolicyStatus(before),
+                baselinePolicyStatus(after),
+                licenseCountDiff(before, after)
         );
+    }
+
+    private String baselinePolicyStatus(StoredScanSummaryResponse summary) {
+        PersistedScanRecord record = repository.findById(summary.scanId()).orElse(null);
+        return record == null || record.result() == null || record.result().policyEvaluation() == null
+                ? null
+                : record.result().policyEvaluation().overallStatus();
+    }
+
+    private CountDiff licenseCountDiff(StoredScanSummaryResponse before, StoredScanSummaryResponse after) {
+        PersistedScanRecord beforeRecord = repository.findById(before.scanId()).orElse(null);
+        PersistedScanRecord afterRecord = repository.findById(after.scanId()).orElse(null);
+        int beforeCount = beforeRecord == null || beforeRecord.result() == null ? 0 : beforeRecord.result().licenses().size();
+        int afterCount = afterRecord == null || afterRecord.result() == null ? 0 : afterRecord.result().licenses().size();
+        return countDiff(beforeCount, afterCount);
     }
 
     private CountDiff countDiff(int before, int after) {

@@ -26,6 +26,9 @@ public record AnalysisSummary(
         int possiblyRuntimeUsedDependencyCount,
         int slimmingOpportunityCount,
         long estimatedRemovableSizeBytes,
-        int awsBundleWarningCount
+        int awsBundleWarningCount,
+        int policyWarningCount,
+        int policyFailureCount,
+        String overallPolicyStatus
 ) {
 }

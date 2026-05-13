@@ -22,6 +22,7 @@ public record AnalysisResult(
         List<DependencyUsageFinding> dependencyUsage,
         List<SlimmingOpportunity> slimmingOpportunities,
         AwsBundleAdvice awsBundleAdvice,
+        PolicyEvaluation policyEvaluation,
         String dependencyTreeText,
         List<String> warnings,
         List<String> errors,

@@ -175,7 +175,7 @@ class ScanHistoryPersistenceTests {
                 "demo",
                 "1.0.0",
                 "Java 17",
-                List.of(new VulnerabilityFinding(Severity.HIGH, "CVE-2026-0001", 7.5, "pkg:maven/com.example/demo@1.0.0", "1.0.0", null, null, List.of(), "dc"))
+                List.of(new VulnerabilityFinding(Severity.HIGH, "CVE-2026-0001", 7.5, "pkg:maven/com.example/demo@1.0.0", "1.0.0", null, null, List.of(), "dc", false, null, null))
         ));
         scanHistoryService.persistCompletedScan(buildJobWithSingleArtifact(
                 "job-target",
@@ -185,7 +185,7 @@ class ScanHistoryPersistenceTests {
                 "demo",
                 "2.0.0",
                 "Java 21",
-                List.of(new VulnerabilityFinding(Severity.CRITICAL, "CVE-2026-0002", 9.8, "pkg:maven/com.example/demo@2.0.0", "2.0.0", null, null, List.of(), "dc"))
+                List.of(new VulnerabilityFinding(Severity.CRITICAL, "CVE-2026-0002", 9.8, "pkg:maven/com.example/demo@2.0.0", "2.0.0", null, null, List.of(), "dc", false, null, null))
         ));
 
         String baseId = scanHistoryRepository.findByJobId("job-base").orElseThrow().id();
@@ -285,7 +285,7 @@ class ScanHistoryPersistenceTests {
                 InputType.ARCHIVE_UPLOAD,
                 startedAt,
                 completedAt,
-                new AnalysisSummary(1, 3, 1, 2, 0, 1, 1, 0, 0, 0, 8.7, "Java 17", 1, 1, 1, 2, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0),
+                new AnalysisSummary(1, 3, 1, 2, 0, 1, 1, 0, 0, 0, 8.7, "Java 17", 1, 1, 1, 2, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, null),
                 List.of(artifact),
                 null,
                 List.of(),
@@ -294,6 +294,7 @@ class ScanHistoryPersistenceTests {
                 List.of(),
                 List.of(),
                 List.of(),
+                null,
                 null,
                 null,
                 List.of(),
@@ -369,7 +370,10 @@ class ScanHistoryPersistenceTests {
                         0,
                         0,
                         0,
-                        0),
+                        0,
+                        0,
+                        0,
+                        null),
                 List.of(artifact),
                 null,
                 List.of(),
@@ -378,6 +382,7 @@ class ScanHistoryPersistenceTests {
                 List.of(),
                 List.of(),
                 List.of(),
+                null,
                 null,
                 null,
                 List.of(),

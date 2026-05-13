@@ -33,11 +33,18 @@ public class ScanHistoryService {
     private final ScanHistoryRepository repository;
     private final ObjectMapper objectMapper;
     private final JarScanProperties properties;
+    private final ScanResultViewService scanResultViewService;
 
-    public ScanHistoryService(ScanHistoryRepository repository, ObjectMapper objectMapper, JarScanProperties properties) {
+    public ScanHistoryService(
+            ScanHistoryRepository repository,
+            ObjectMapper objectMapper,
+            JarScanProperties properties,
+            ScanResultViewService scanResultViewService
+    ) {
         this.repository = repository;
         this.objectMapper = objectMapper;
         this.properties = properties;
+        this.scanResultViewService = scanResultViewService;
     }
 
     public void persistCompletedScan(AnalysisJob job) {
@@ -117,11 +124,16 @@ public class ScanHistoryService {
     public StoredScanResponse getStoredScan(String scanId) {
         PersistedScanRecord record = repository.findById(scanId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown scan: " + scanId));
-        return new StoredScanResponse(toSummaryResponse(record), record.result());
+        return new StoredScanResponse(toSummaryResponse(record), decorate(record.result()));
     }
 
     public Optional<AnalysisResult> findResultByJobId(String jobId) {
-        return repository.findByJobId(jobId).map(PersistedScanRecord::result);
+        return repository.findByJobId(jobId).map(PersistedScanRecord::result).map(this::decorate);
+    }
+
+    public Optional<StoredScanResponse> findStoredScanByJobId(String jobId) {
+        return repository.findByJobId(jobId)
+                .map(record -> new StoredScanResponse(toSummaryResponse(record), decorate(record.result())));
     }
 
     public Optional<AnalysisJobStatusResponse> findStatusByJobId(String jobId) {
@@ -148,6 +160,43 @@ public class ScanHistoryService {
         return repository.updateMetadata(scanId, new StoredScanMetadataUpdate(request.notes(), normalizeTags(request.tags())))
                 .map(this::toSummaryResponse)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown scan: " + scanId));
+    }
+
+    public StoredScanSummaryResponse persistImportedScan(AnalysisResult result, InputType inputType, String inputName, String inputHash) {
+        String scanId = UUID.randomUUID().toString();
+        Instant now = Instant.now();
+        repository.upsert(new PersistedScanUpsert(
+                scanId,
+                result.jobId(),
+                inputType,
+                inputName,
+                inputHash,
+                JobStatus.COMPLETED,
+                result.startedAt(),
+                result.completedAt(),
+                durationMs(result.startedAt(), result.completedAt()),
+                result.summary().totalArtifacts(),
+                result.summary().totalDependencies(),
+                result.summary().totalVulnerabilities(),
+                result.summary().critical(),
+                result.summary().high(),
+                result.summary().medium(),
+                result.summary().low(),
+                result.summary().info(),
+                result.summary().unknown(),
+                result.summary().highestCvss(),
+                result.summary().requiredJavaVersion(),
+                properties.appVersion(),
+                "Imported from CycloneDX JSON SBOM.",
+                List.of("sbom", "import"),
+                serializeResult(result),
+                result,
+                now,
+                now
+        ));
+        return repository.findById(scanId)
+                .map(this::toSummaryResponse)
+                .orElseThrow(() -> new IllegalStateException("Imported SBOM scan was not persisted"));
     }
 
     public StoredScanSummaryResponse toSummaryResponse(PersistedScanRecord record) {
@@ -203,6 +252,10 @@ public class ScanHistoryService {
         } catch (JsonProcessingException ex) {
             throw new IllegalStateException("Unable to serialize analysis result", ex);
         }
+    }
+
+    private AnalysisResult decorate(AnalysisResult result) {
+        return result == null ? null : scanResultViewService.decorate(result);
     }
 
     private String joinMessages(List<String> messages) {

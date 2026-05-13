@@ -12,9 +12,11 @@ import java.nio.charset.StandardCharsets;
 public class ReportExportService {
 
     private final ObjectMapper objectMapper;
+    private final SbomService sbomService;
 
-    public ReportExportService(ObjectMapper objectMapper) {
+    public ReportExportService(ObjectMapper objectMapper, SbomService sbomService) {
         this.objectMapper = objectMapper;
+        this.sbomService = sbomService;
     }
 
     public byte[] export(AnalysisResult result, String format) {
@@ -22,6 +24,7 @@ public class ReportExportService {
             case "json" -> exportJson(result);
             case "md", "markdown" -> exportMarkdown(result).getBytes(StandardCharsets.UTF_8);
             case "html" -> exportHtml(result).getBytes(StandardCharsets.UTF_8);
+            case "cyclonedx-json" -> sbomService.exportCycloneDx(result);
             default -> throw new IllegalArgumentException("Unsupported export format: " + format);
         };
     }
@@ -31,6 +34,7 @@ public class ReportExportService {
             case "json" -> MediaType.APPLICATION_JSON;
             case "md", "markdown" -> new MediaType("text", "markdown", StandardCharsets.UTF_8);
             case "html" -> MediaType.TEXT_HTML;
+            case "cyclonedx-json" -> new MediaType("application", "vnd.cyclonedx+json", StandardCharsets.UTF_8);
             default -> MediaType.APPLICATION_OCTET_STREAM;
         };
     }

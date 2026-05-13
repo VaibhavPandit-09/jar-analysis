@@ -31,7 +31,10 @@ class DependencySlimmingAdvisorServiceTests {
                         "Review before removal.",
                         List.of(List.of("com.example:demo:1.0.0", "org.example:parent:2.0.0", "org.example:child:1.1.0")),
                         2_048L,
-                        0
+                        0,
+                        false,
+                        null,
+                        null
                 )),
                 List.of(),
                 List.of(),
@@ -59,7 +62,10 @@ class DependencySlimmingAdvisorServiceTests {
                 "Keep unless narrowing modules.",
                 List.of(List.of("com.example:demo:1.0.0", "software.amazon.awssdk:bundle:2.25.0")),
                 10_000L,
-                0
+                0,
+                false,
+                null,
+                null
         );
 
         DependencySlimmingAdvisorService.DependencySlimmingAdvisorResult result = service.analyze(
@@ -73,7 +79,10 @@ class DependencySlimmingAdvisorServiceTests {
                         "NEAREST_WINS_CONFLICT",
                         "HIGH",
                         "Align versions.",
-                        "<dependencyManagement />"
+                        "<dependencyManagement />",
+                        false,
+                        null,
+                        null
                 )),
                 List.of(new DuplicateClassFinding(
                         "EXACT_DUPLICATE_CLASS",
@@ -82,7 +91,10 @@ class DependencySlimmingAdvisorServiceTests {
                         List.of("a.jar", "b.jar"),
                         "MEDIUM",
                         "Exclude one provider.",
-                        "Classpath shadowing warning."
+                        "Classpath shadowing warning.",
+                        false,
+                        null,
+                        null
                 )),
                 dependencyTree(),
                 Set.of("s3")
